@@ -1,0 +1,11 @@
+[bun]
+# Bun runtime configuration
+logLevel = "info"
+
+[test]
+# Test configuration
+root = "."
+
+[install]
+# Installation preferences
+auto = true

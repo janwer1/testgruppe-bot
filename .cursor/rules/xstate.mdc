@@ -1,0 +1,23 @@
+---
+description: XState usage rules to ensure the State Machine is the single source of truth
+globs: src/domain/*.ts
+alwaysApply: true
+---
+
+# XState Best Practices
+
+1.  **Single Source of Truth**:
+    -   NEVER manually assign properties to the context outside of the machine (e.g., `state.context.foo = bar` is BANNED).
+    -   ALWAYS dispatch an event to update state (e.g., `actor.send({ type: "SET_FOO", value: "bar" })`).
+
+2.  **Machine Definition**:
+    -   Use XState v5 `setup({ ... }).createMachine({ ... })` syntax.
+    -   Define `types` for `context`, `events`, `input`, and `children` explicitly.
+
+3.  **Restoration**:
+    -   When rehydrating an entity from storage, use a **deterministic event replay** pattern.
+    -   Do NOT pass a "partial context" to the machine. Replay the events that got it there (e.g., `START` -> `SUBMIT` -> `APPROVE`).
+
+4.  **Persistence**:
+    -   The Repository saves `actor.getSnapshot().context`.
+    -   The Repository loads `context` and passes it to `Entity.fromContext()`.

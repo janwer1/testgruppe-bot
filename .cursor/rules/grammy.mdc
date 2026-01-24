@@ -1,0 +1,27 @@
+---
+description: Best practices for Grammy Bot framework, Context, and Session usage
+globs: src/**/*.ts
+alwaysApply: false
+---
+
+# Grammy & Telegram Bot Rules
+
+1.  **Session Usage**:
+    -   We use `@grammyjs/storage-redis`.
+    -   Session data is strictly for **Conversation Control** (e.g., "which step is the user on?").
+    -   Do NOT store heavy business objects in `ctx.session`. Store their ID (`requestId`) and load them from the Repository.
+
+2.  **Conversations**:
+    -   Use the `conversations` middleware.
+    -   Avoid `while(true)` loops for "retrying" input unless strictly necessary. Prefer `wait()` -> `validate` -> `return/loop`.
+    -   Do not rely on `ctx.message.text` being present *before* entering `wait()`.
+
+3.  **Keyboards**:
+    -   Use `InlineKeyboard` for actions.
+    -   Encode IDs in callback data (e.g., `approve:<requestId>`).
+    -   Validate callback data strictly in handlers.
+
+4.  **Error Handling**:
+    -   Never swallow errors in handlers.
+    -   Use a global error boundary (middleware).
+    -   Inform the user if a command fails (do not leave them hanging).
