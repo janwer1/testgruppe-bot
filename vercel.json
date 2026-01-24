@@ -1,8 +1,9 @@
 {
   "functions": {
-    "api/telegram.ts": {
+    "api/minimal-bot.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 30
     }
-  }
+  },
+  "outputDirectory": "."
 }

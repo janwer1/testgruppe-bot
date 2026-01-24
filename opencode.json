@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "Vercel": {
+      "type": "remote",
+      "url": "https://mcp.vercel.com/sphr/testgruppe-bot",
+      "oauth": {}
+    }
+  }
+}
