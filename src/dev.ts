@@ -10,16 +10,6 @@ async function main() {
 
   const bot = createBot();
 
-  // Store original webhook info to restore on exit
-  let originalWebhook: any | undefined;
-  try {
-    originalWebhook = await bot.api.getWebhookInfo();
-    if (originalWebhook.url) {
-      console.log(`ℹ️  Found existing webhook: ${originalWebhook.url}`);
-    }
-  } catch (error) {
-    console.warn("⚠️  Failed to check existing webhook info:", error);
-  }
 
   // Delete webhook to allow getUpdates (long polling)
   try {
@@ -37,20 +27,21 @@ async function main() {
     console.log("\n🛑 Stopping bot...");
     await bot.stop();
 
-    if (originalWebhook?.url) {
-      console.log(`🔄 Restoring webhook to: ${originalWebhook.url}`);
+    // Always restore webhook on exit (using env vars)
+    if (env.PUBLIC_BASE_URL && env.WEBHOOK_PATH) {
+      const webhookUrl = `${env.PUBLIC_BASE_URL}${env.WEBHOOK_PATH}`;
+      console.log(`🔄 Restoring webhook to: ${webhookUrl}`);
       try {
-        await bot.api.setWebhook(originalWebhook.url, {
-          ip_address: originalWebhook.ip_address,
-          max_connections: originalWebhook.max_connections,
-          allowed_updates: originalWebhook.allowed_updates,
-          drop_pending_updates: false,
+        await bot.api.setWebhook(webhookUrl, {
           secret_token: env.WEBHOOK_SECRET_TOKEN,
+          drop_pending_updates: false,
         });
         console.log("✅ Webhook restored.");
       } catch (error) {
         console.error("❌ Failed to restore webhook:", error);
       }
+    } else {
+      console.warn("⚠️  Cannot restore webhook: PUBLIC_BASE_URL or WEBHOOK_PATH not set");
     }
     process.exit(0);
   };
