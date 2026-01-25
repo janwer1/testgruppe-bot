@@ -20,14 +20,14 @@ function createRequestInState(state: string, requestId: string = "test-request-i
     request.startCollection();
   } else if (state === "awaitingReview") {
     request.startCollection();
-    request.submitReason("Test reason");
+    request.submitReason("Test reason for join request");
   } else if (state === "approved") {
     request.startCollection();
-    request.submitReason("Test reason");
+    request.submitReason("Test reason for join request");
     request.approve(999, "Admin User");
   } else if (state === "declined") {
     request.startCollection();
-    request.submitReason("Test reason");
+    request.submitReason("Test reason for join request");
     request.decline(999, "Admin User");
   }
   // "pending" state is the initial state, no transition needed

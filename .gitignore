@@ -143,3 +143,8 @@ vite.config.ts.timestamp-*
 
 .vercel
 .env*.local
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example

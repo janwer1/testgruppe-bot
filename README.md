@@ -109,32 +109,52 @@ bun --inspect=0.0.0.0:9230 src/dev.ts
 
 Then connect using any Node.js debugger client.
 
-## Production Mode (Vercel)
+## Production Mode (Cloudflare Workers)
 
-### 1. Deploy to Vercel
+### 1. Configure Cloudflare
 
-The bot includes a Vercel serverless function handler at `api/telegram.ts`.
+The bot is configured to run as a Cloudflare Worker using the entry point at `src/worker.ts`.
 
-### 2. Set Environment Variables in Vercel
+### 2. Set Environment Variables in Cloudflare
 
-Add all required environment variables in Vercel dashboard:
+You can push your local `.env` variables as secrets to Cloudflare in one go:
+
+```bash
+# Push all variables as secrets
+while read -r line; do
+  if [[ ! -z "$line" && "$line" != \#* ]]; then
+    key=$(echo "$line" | cut -d '=' -f 1)
+    value=$(echo "$line" | cut -d '=' -f 2-)
+    value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//')
+    echo "$value" | bunx wrangler secret put "$key"
+  fi
+done < .env
+```
+
+Required variables:
 - `MODE=prod`
 - `BOT_TOKEN`
 - `TARGET_CHAT_ID`
 - `ADMIN_REVIEW_CHAT_ID`
-- `PUBLIC_BASE_URL` (your Vercel app URL)
-- `WEBHOOK_PATH=/api/telegram`
+- `PUBLIC_BASE_URL` (e.g., `https://your-worker.your-subdomain.workers.dev`)
 - `WEBHOOK_SECRET_TOKEN` (random secure string)
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+- `JOIN_LINK`
 
-### 3. Set Webhook
-
-After deployment, run the webhook setup script:
+### 3. Deploy
 
 ```bash
-bun run set-webhook
+bun run deploy
 ```
 
-This will configure Telegram to send updates to your Vercel function.
+### 4. Set Webhook
+
+After deployment, register your Worker URL with Telegram:
+
+```bash
+bun run webhook:setup
+```
 
 ## Environment Variables
 
@@ -146,8 +166,8 @@ This will configure Telegram to send updates to your Vercel function.
 - `LOG_LEVEL`: `debug`, `info`, `warn`, or `error` (default: `info`)
 
 ### Required (prod only)
-- `PUBLIC_BASE_URL`: Your Vercel app URL (e.g., `https://your-app.vercel.app`)
-- `WEBHOOK_PATH`: Webhook path (e.g., `/api/telegram`)
+- `PUBLIC_BASE_URL`: Your Cloudflare Worker URL
+- `WEBHOOK_PATH`: Webhook path (default: `/api/bot`)
 - `WEBHOOK_SECRET_TOKEN`: Random secret token for webhook validation
 
 ### Optional
@@ -175,35 +195,38 @@ This will configure Telegram to send updates to your Vercel function.
 
 ## Scripts
 
-- `bun run dev`: Start development server with hot reload
-- `bun run start`: Start production server
+- `bun run dev`: Start development server (long polling) with hot reload
+- `bun run start`: Start local development worker (wrangler dev)
 - `bun run build`: Compile TypeScript
 - `bun run type-check`: Type check without compilation
-- `bun run set-webhook`: Set webhook for production mode
+- `bun run deploy`: Deploy to Cloudflare Workers
+- `bun run webhook:setup`: Set webhook for production
+- `bun run webhook:test`: Simulate a webhook call locally or to prod
 
 ## Project Structure
 
 ```
 .
 ├── src/
-│   ├── bot.ts              # Bot initialization
-│   ├── dev.ts              # Development entry point
-│   ├── vercel.ts           # Production webhook handler
-│   ├── webhook-setup.ts    # Webhook configuration script
-│   ├── env.ts              # Environment validation
+│   ├── bot.ts              # Core bot initialization
+│   ├── dev.ts              # Local long polling entry point
+│   ├── worker.ts           # Cloudflare Worker entry point
+│   ├── env.ts              # Resilient environment validation
 │   ├── types.ts            # TypeScript types
 │   ├── handlers/          # Event handlers
 │   │   ├── joinRequest.ts
 │   │   ├── callbacks.ts
 │   │   └── errors.ts
-│   ├── conversations/      # Conversation flows
-│   │   └── collectReason.ts
+│   ├── repositories/      # Data access
+│   │   └── JoinRequestRepository.ts
+│   ├── scripts/           # Management scripts
+│   │   ├── setup-webhook.ts
+│   │   └── test-webhook.ts
 │   └── services/          # Business logic
 │       ├── authz.ts
 │       ├── reviewCard.ts
 │       └── state.ts
-├── api/
-│   └── telegram.ts        # Vercel API route
+├── wrangler.jsonc         # Cloudflare configuration
 ├── package.json
 ├── tsconfig.json
 └── bunfig.toml

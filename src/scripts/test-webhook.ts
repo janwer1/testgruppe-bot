@@ -3,7 +3,7 @@ import { env } from "../env";
 
 async function main() {
     // Use config from env or defaults
-    const baseUrl = env.PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = env.PUBLIC_BASE_URL || "http://localhost:8787";
     const webhookPath = env.WEBHOOK_PATH || "/api/bot";
     const url = `${baseUrl}${webhookPath}`;
 

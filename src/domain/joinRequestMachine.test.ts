@@ -38,10 +38,10 @@ test("joinRequestMachine should transition to awaitingReview on SUBMIT_REASON", 
     actor.start();
 
     actor.send({ type: "START_COLLECTION" });
-    actor.send({ type: "SUBMIT_REASON", reason: "Test reason" });
+    actor.send({ type: "SUBMIT_REASON", reason: "Test reason here" });
 
     expect(actor.getSnapshot().value).toBe("awaitingReview");
-    expect(actor.getSnapshot().context.reason).toBe("Test reason");
+    expect(actor.getSnapshot().context.reason).toBe("Test reason here");
   });
 
 test("joinRequestMachine should reject invalid reason (too long)", () => {
@@ -66,7 +66,7 @@ test("joinRequestMachine should add messages in awaitingReview state", () => {
     actor.start();
 
     actor.send({ type: "START_COLLECTION" });
-    actor.send({ type: "SUBMIT_REASON", reason: "Test reason" });
+    actor.send({ type: "SUBMIT_REASON", reason: "Test reason messages" });
     actor.send({ type: "ADD_MESSAGE", message: "Message 1" });
     actor.send({ type: "ADD_MESSAGE", message: "Message 2" });
 
@@ -74,27 +74,27 @@ test("joinRequestMachine should add messages in awaitingReview state", () => {
     expect(context.additionalMessages).toEqual(["Message 1", "Message 2"]);
   });
 
-test("joinRequestMachine should set admin message ID", () => {
+  test("joinRequestMachine should set admin message ID", () => {
     const actor = createActor(joinRequestMachine, {
       input: createTestInput(),
     });
     actor.start();
 
     actor.send({ type: "START_COLLECTION" });
-    actor.send({ type: "SUBMIT_REASON", reason: "Test reason" });
+    actor.send({ type: "SUBMIT_REASON", reason: "Test reason admin" });
     actor.send({ type: "SET_ADMIN_MSG_ID", adminMsgId: 999 });
 
     expect(actor.getSnapshot().context.adminMsgId).toBe(999);
   });
 
-test("joinRequestMachine should approve request", () => {
+  test("joinRequestMachine should approve request", () => {
     const actor = createActor(joinRequestMachine, {
       input: createTestInput(),
     });
     actor.start();
 
     actor.send({ type: "START_COLLECTION" });
-    actor.send({ type: "SUBMIT_REASON", reason: "Test reason" });
+    actor.send({ type: "SUBMIT_REASON", reason: "Test reason approve" });
     actor.send({ type: "APPROVE", adminId: 123, adminName: "Admin" });
 
     expect(actor.getSnapshot().value).toBe("approved");
@@ -102,14 +102,14 @@ test("joinRequestMachine should approve request", () => {
     expect(actor.getSnapshot().context.decision?.adminId).toBe(123);
   });
 
-test("joinRequestMachine should decline request", () => {
+  test("joinRequestMachine should decline request", () => {
     const actor = createActor(joinRequestMachine, {
       input: createTestInput(),
     });
     actor.start();
 
     actor.send({ type: "START_COLLECTION" });
-    actor.send({ type: "SUBMIT_REASON", reason: "Test reason" });
+    actor.send({ type: "SUBMIT_REASON", reason: "Test reason decline" });
     actor.send({ type: "DECLINE", adminId: 456, adminName: "Admin" });
 
     expect(actor.getSnapshot().value).toBe("declined");
@@ -138,12 +138,12 @@ test("joinRequestMachine should not allow approve twice", () => {
     actor.start();
 
     actor.send({ type: "START_COLLECTION" });
-    actor.send({ type: "SUBMIT_REASON", reason: "Test reason" });
+    actor.send({ type: "SUBMIT_REASON", reason: "Test reason twice" });
     actor.send({ type: "APPROVE", adminId: 123, adminName: "Admin" });
-    
+
     // Try to approve again (should be ignored since we're in final state)
     const beforeState = actor.getSnapshot().value;
     actor.send({ type: "APPROVE", adminId: 456, adminName: "Another Admin" });
-    
+
     expect(actor.getSnapshot().value).toBe(beforeState); // Should remain in approved
   });

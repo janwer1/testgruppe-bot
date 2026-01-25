@@ -65,7 +65,7 @@ test("JoinRequest should add additional messages", () => {
   const input = createTestInput();
   const request = new JoinRequest(input);
   request.startCollection();
-  request.submitReason("Initial reason");
+  request.submitReason("Initial reason for test");
 
   const result = request.addMessage("Additional information");
   expect(result.success).toBe(true);
@@ -78,7 +78,7 @@ test("JoinRequest should set admin message ID", () => {
   const input = createTestInput();
   const request = new JoinRequest(input);
   request.startCollection();
-  request.submitReason("Test reason");
+  request.submitReason("Test reason for request");
 
   const result = request.setAdminMsgId(999);
   expect(result.success).toBe(true);
@@ -91,7 +91,7 @@ test("JoinRequest should approve request", () => {
   const input = createTestInput();
   const request = new JoinRequest(input);
   request.startCollection();
-  request.submitReason("Test reason");
+  request.submitReason("Test reason for approval");
 
   const result = request.approve(123, "Admin Name");
   expect(result.success).toBe(true);
@@ -108,7 +108,7 @@ test("JoinRequest should decline request", () => {
   const input = createTestInput();
   const request = new JoinRequest(input);
   request.startCollection();
-  request.submitReason("Test reason");
+  request.submitReason("Test reason for decline");
 
   const result = request.decline(456, "Admin Name");
   expect(result.success).toBe(true);
@@ -135,7 +135,7 @@ test("JoinRequest should not allow approving twice", () => {
   const input = createTestInput();
   const request = new JoinRequest(input);
   request.startCollection();
-  request.submitReason("Test reason");
+  request.submitReason("Test reason double approve");
   request.approve(123, "Admin Name");
 
   // Request is now in "approved" state (final state)
@@ -150,7 +150,7 @@ test("JoinRequest should restore from context correctly", () => {
   const input = createTestInput();
   const request = new JoinRequest(input);
   request.startCollection();
-  request.submitReason("Test reason");
+  request.submitReason("Test reason for restore");
   request.setAdminMsgId(999);
   request.addMessage("Message 1");
   request.addMessage("Message 2");
@@ -159,7 +159,7 @@ test("JoinRequest should restore from context correctly", () => {
   const restored = JoinRequest.fromContext(context);
 
   expect(restored.getState()).toBe("awaitingReview");
-  expect(restored.getContext().reason).toBe("Test reason");
+  expect(restored.getContext().reason).toBe("Test reason for restore");
   expect(restored.getContext().adminMsgId).toBe(999);
   expect(restored.getContext().additionalMessages).toEqual(["Message 1", "Message 2"]);
 });
@@ -168,7 +168,7 @@ test("JoinRequest should restore approved request from context", () => {
   const input = createTestInput();
   const request = new JoinRequest(input);
   request.startCollection();
-  request.submitReason("Test reason");
+  request.submitReason("Test reason restore approved");
   request.approve(123, "Admin Name");
 
   const context = request.getContext();

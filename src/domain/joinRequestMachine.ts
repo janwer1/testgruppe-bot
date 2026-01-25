@@ -1,6 +1,5 @@
 import { setup, assign } from "xstate";
-import { env } from "../env";
-import { reasonSchema, additionalMessageSchema } from "../utils/validation";
+import { validateReason, validateAdditionalMessage } from "../utils/validation";
 
 // Machine context type - exported for use in repository
 export interface JoinRequestContext {
@@ -46,11 +45,11 @@ export const joinRequestMachine = setup({
   guards: {
     isValidReason: ({ event }) => {
       if (event.type !== "SUBMIT_REASON") return false;
-      return reasonSchema.safeParse(event.reason).success;
+      return validateReason(event.reason).success;
     },
     isValidMessage: ({ event }) => {
       if (event.type !== "ADD_MESSAGE") return false;
-      return additionalMessageSchema.safeParse(event.message).success;
+      return validateAdditionalMessage(event.message).success;
     },
     isReadyForDecision: ({ context }) => {
       return context.reason !== undefined;

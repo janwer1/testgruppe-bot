@@ -109,9 +109,11 @@ class MemoryStateStore implements StateStoreInterface {
   private ttl: number;
 
   constructor() {
-    this.ttl = env.REASON_TTL_SECONDS * 1000; // Convert to milliseconds
+    this.ttl = (env.REASON_TTL_SECONDS || 604800) * 1000; // Convert to milliseconds
     // Clean up expired entries every 5 minutes
-    setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    if (typeof setInterval !== 'undefined') {
+        setInterval(() => this.cleanup(), 5 * 60 * 1000);
+    }
   }
 
   private requestKey(requestId: string): string {
@@ -180,11 +182,15 @@ class MemoryStateStore implements StateStoreInterface {
 // Create state store based on environment
 let stateStore: StateStoreInterface;
 
-if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+// If we are in test mode OR Redis is not configured, use MemoryStateStore
+const isTest = process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test";
+const hasRedisConfig = !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN && !env.UPSTASH_REDIS_REST_URL.includes("example.com"));
+
+if (!isTest && hasRedisConfig) {
   console.log("[StateStore] Using Redis for persistent storage");
   stateStore = new RedisStateStore();
 } else {
-  console.log("[StateStore] Using in-memory storage (Redis not configured)");
+  console.log(`[StateStore] Using in-memory storage (${isTest ? "Test Mode" : "Redis not configured"})`);
   stateStore = new MemoryStateStore();
 }
 
