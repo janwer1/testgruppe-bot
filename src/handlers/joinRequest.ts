@@ -2,7 +2,6 @@ import { BotContext } from "../types";
 import { postReviewCard } from "../services/reviewCard";
 import { joinRequestRepository } from "../repositories/JoinRequestRepository";
 import { handleError } from "./errors";
-import { randomBytes } from "crypto";
 import type { JoinRequestInput } from "../domain/joinRequestMachine";
 
 const DM_FAILED_MESSAGE =
@@ -20,7 +19,9 @@ export function registerJoinRequestHandler(bot: any): void {
       const user = joinRequest.from;
 
       // Generate unique request ID
-      const requestId = randomBytes(8).toString("hex");
+      const requestId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
       const userName = `${user.first_name}${user.last_name ? ` ${user.last_name}` : ""}`;
 
       // Store initial request state BEFORE entering conversation
@@ -48,12 +49,12 @@ export function registerJoinRequestHandler(bot: any): void {
 
       const request = await joinRequestRepository.create(input);
 
-          // Try to send DM and start conversation
-          try {
-            console.log(`[Join Request] Entering conversation for user ${userId}...`);
+      // Try to send DM and start conversation
+      try {
+        console.log(`[Join Request] Entering conversation for user ${userId}...`);
 
-            // Enter conversation to collect reason (conversation will send the DM)
-            await ctx.conversation.enter("collectReason");
+        // Enter conversation to collect reason (conversation will send the DM)
+        await ctx.conversation.enter("collectReason");
       } catch (dmError) {
         // User may have blocked bot or privacy settings prevent DMs
         console.error("Failed to send DM to user:", dmError);

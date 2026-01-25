@@ -1,28 +1,52 @@
 import { FluentBundle, FluentResource } from "@fluent/bundle";
 import { ReviewCardData } from "../services/reviewCard";
-import { readFileSync } from "fs";
-import { join } from "path";
-import { fileURLToPath } from "url";
-import { dirname } from "path";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const ftlContent = `
+review-card =
+  📋 Neue Beitrittsanfrage - Bitte prüfen
+
+  👤 Nutzer: { $userName }{ $username ->
+      *[none] ""
+       [some]  (@{ $usernameValue })
+  }
+  🆔 ID: { $userId }
+  🕐 Zeitpunkt: { $formattedDate }
+
+  📝 Begründung:
+  { $reason }
+  { $additionalMessagesValue }
+
+review-card-updated =
+  { $status ->
+      [approved] ✅ GENEHMIGT
+     *[declined] ❌ ABGELEHNT
+  }
+
+  👤 Nutzer: { $userName }{ $username ->
+      *[none] ""
+       [some]  (@{ $usernameValue })
+  }
+  🆔 ID: { $userId }
+
+  📝 Begründung:
+  { $reason }
+
+  ---
+  { $status ->
+      [approved] GENEHMIGT von: { $adminName }
+      *[declined] ABGELEHNT von: { $adminName }
+  }
+`;
 
 // Load and parse the Fluent template
 let bundle: FluentBundle | null = null;
 
 function getBundle(): FluentBundle {
   if (!bundle) {
-    const ftlPath = join(__dirname, "reviewCard.ftl");
-    console.log(`[Template] Loading Fluent template from: ${ftlPath}`);
-    
     try {
-      const ftlContent = readFileSync(ftlPath, "utf-8");
-      console.log(`[Template] Template file loaded, length: ${ftlContent.length} chars`);
-      
       const resource = new FluentResource(ftlContent);
       bundle = new FluentBundle("de", { useIsolating: false });
-      
+
       const errors = bundle.addResource(resource);
       if (errors.length > 0) {
         console.error("[Template] Fluent parsing errors:", errors);
@@ -36,17 +60,14 @@ function getBundle(): FluentBundle {
           });
         });
       } else {
-        console.log("[Template] Fluent bundle loaded successfully");
         // Verify messages exist
         const reviewCardMsg = bundle.getMessage("review-card");
-        const updatedMsg = bundle.getMessage("review-card-updated");
-        console.log(`[Template] review-card exists: ${!!reviewCardMsg}, review-card-updated exists: ${!!updatedMsg}`);
         if (!reviewCardMsg) {
           console.error("[Template] review-card message not found! Available messages:", Array.from(bundle._messages.keys()));
         }
       }
     } catch (error) {
-      console.error(`[Template] Error loading Fluent template from ${ftlPath}:`, error);
+      console.error(`[Template] Error loading Fluent template:`, error);
       throw error;
     }
   }
@@ -58,24 +79,24 @@ export function formatReviewCardMessage(
   timezone: string = "Europe/Berlin"
 ): string {
   const bundle = getBundle();
-  
+
   // Format timestamp with timezone
   const date = new Date(data.timestamp);
   const formattedDate = formatDateWithTimezone(date, timezone);
-  
+
   const messageObj = bundle.getMessage("review-card");
   if (!messageObj?.value) {
     console.error("[Template] review-card not found in Fluent bundle");
     return "";
   }
-  
+
   // Fluent select expressions match on variable values
   // We pass "none" or "some" as the username value for the select expression
   // But we also need the actual username string for interpolation
   // So we pass both: usernameVariant for the select, and usernameValue for the text
   const usernameVariant = data.username ? "some" : "none";
   const usernameValue = data.username || "";
-  
+
   // Format additional messages if any
   const hasAdditionalMessages = data.additionalMessages && data.additionalMessages.length > 0;
   const additionalMessagesText = hasAdditionalMessages
@@ -92,7 +113,7 @@ export function formatReviewCardMessage(
     reason: data.reason,
     additionalMessagesValue: additionalMessagesText, // For actual text content (empty string or formatted messages)
   });
-  
+
   return message || "";
 }
 
@@ -103,19 +124,19 @@ export function formatUpdatedReviewCardMessage(
   timezone: string = "Europe/Berlin"
 ): string {
   const bundle = getBundle();
-  
+
   const messageObj = bundle.getMessage("review-card-updated");
   if (!messageObj?.value) {
     console.error("[Template] review-card-updated not found in Fluent bundle");
     return "";
   }
-  
+
   // Fluent select expressions match on variable values
   // We pass "none" or "some" as the username value for the select expression
   // But we also need the actual username string for interpolation
   const usernameVariant = data.username ? "some" : "none";
   const usernameValue = data.username || "";
-  
+
   const message = bundle.formatPattern(messageObj.value, {
     userName: data.userName,
     username: usernameVariant, // For select expression matching
@@ -125,7 +146,7 @@ export function formatUpdatedReviewCardMessage(
     status,
     adminName,
   });
-  
+
   return message || "";
 }
 

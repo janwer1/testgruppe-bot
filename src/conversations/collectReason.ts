@@ -4,7 +4,7 @@ import { postReviewCard, ReviewCardData } from "../services/reviewCard";
 import { joinRequestRepository } from "../repositories/JoinRequestRepository";
 import { validateReason, validateAdditionalMessage } from "../utils/validation";
 import type { JoinRequestInput } from "../domain/joinRequestMachine";
-import { randomBytes } from "crypto";
+
 import { env } from "../env";
 
 const INVALID_INPUT_MESSAGE = "Please send a text message with your reason.";
@@ -22,7 +22,7 @@ async function sendDM(ctx: BotContext, userId: number, message: string): Promise
     await ctx.reply(message);
     return;
   }
-  
+
   // Otherwise, send as DM to the user
   await ctx.api.sendMessage(userId, message);
 }
@@ -113,7 +113,7 @@ async function handleAdditionalMessages(
   adminMsgId: number
 ): Promise<void> {
   console.log(`[Conversation] Review card posted, now listening for additional messages...`);
-  
+
   // Get user ID from request context (needed for sending DMs)
   const userId = request.getContext().userId;
 
@@ -206,12 +206,12 @@ export async function collectReasonConversation(
   const request = await joinRequestRepository.findByUserId(userId);
   if (!request) {
     console.error(`[Conversation] No request found for user ${userId}`);
-    
+
     // If session has requestId but entity not found, domain entity may have expired
     if (ctx.session?.requestId) {
       console.warn(`[Conversation] Session has requestId ${ctx.session.requestId} but domain entity not found. Entity may have expired.`);
     }
-    
+
     // Don't send another error message - the message handler already sent "I don't have an active join request for you..."
     // if no request was found. Just return silently to avoid duplicate error messages.
     return;
@@ -231,7 +231,7 @@ export async function collectReasonConversation(
     console.error(`[Conversation] Session not initialized for user ${userId}, chatId: ${ctx.chat?.id}, ctx.from: ${ctx.from?.id}, chatType: ${ctx.chat?.type}`);
     console.error(`[Conversation] This means getSessionKey returned undefined when session middleware ran on conversation context.`);
     console.error(`[Conversation] Attempting to work around by manually loading session from storage...`);
-    
+
     // Workaround: Manually load session from storage and assign to ctx.session
     // This handles the case where Grammy's conversations middleware creates a context
     // where getSessionKey returns undefined even though we have ctx.chat.id
@@ -239,7 +239,7 @@ export async function collectReasonConversation(
       const { sessionStorage } = await import("../services/sessionStorage");
       const sessionKey = String(userId);
       let session: SessionData;
-      
+
       const existingSession = await sessionStorage.read(sessionKey);
       if (existingSession) {
         session = existingSession;
@@ -250,7 +250,7 @@ export async function collectReasonConversation(
         await sessionStorage.write(sessionKey, session);
         console.log(`[Conversation] Manually created new session for user ${userId}`);
       }
-      
+
       // Assign session using Object.defineProperty to ensure it persists
       // Grammy might be using a getter/setter, so we need to set it properly
       Object.defineProperty(ctx, "session", {
@@ -259,7 +259,7 @@ export async function collectReasonConversation(
         enumerable: true,
         configurable: true,
       });
-      
+
       // Verify the assignment worked
       if (!ctx.session) {
         console.error(`[Conversation] Failed to assign session - ctx.session is still undefined after assignment!`);
@@ -272,7 +272,7 @@ export async function collectReasonConversation(
       return;
     }
   }
-  
+
   // Now we can safely access ctx.session
   ctx.session.requestId = context.requestId;
   ctx.session.requestingUserId = context.userId;
