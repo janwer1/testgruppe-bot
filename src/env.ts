@@ -31,15 +31,19 @@ const envSchema = {
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   PUBLIC_BASE_URL: z
     .string()
-    .refine((val: string) => {
-      try {
-        new URL(val);
-        return true;
-      } catch {
-        return false;
-      }
-    }, "PUBLIC_BASE_URL must be a valid URL")
-    .optional(),
+    .optional()
+    .refine(
+      (val) => {
+        if (!val) return true;
+        try {
+          new URL(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "PUBLIC_BASE_URL must be a valid URL" }
+    ),
   WEBHOOK_PATH: z.string().default("/api/bot"),
   WEBHOOK_SECRET_TOKEN: z.string().optional(),
   REASON_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
@@ -53,77 +57,51 @@ const envSchema = {
     .default(false),
   UPSTASH_REDIS_REST_URL: z
     .string()
-    .refine((val: string) => {
-      try {
-        new URL(val);
-        return true;
-      } catch {
-        return false;
-      }
-    }, "UPSTASH_REDIS_REST_URL must be a valid URL"),
+    .refine(
+      (val: string) => {
+        try {
+          new URL(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "UPSTASH_REDIS_REST_URL must be a valid URL" }
+    ),
   UPSTASH_REDIS_REST_TOKEN: z.string(),
   JOIN_LINK: z
     .string()
-    .refine((val: string) => {
-      try {
-        new URL(val);
-        return true;
-      } catch {
-        return false;
-      }
-    }, "JOIN_LINK must be a valid URL"),
+    .refine(
+      (val: string) => {
+        try {
+          new URL(val);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { message: "JOIN_LINK must be a valid URL" }
+    ),
 };
 
-// Default values to use when validation is skipped or fails during startup check
-const defaultValues: Record<string, any> = {
-  MODE: "prod",
-  BOT_TOKEN: "dummy_token",
-  TARGET_CHAT_ID: 0,
-  ADMIN_REVIEW_CHAT_ID: 0,
-  LOG_LEVEL: "info",
-  WEBHOOK_PATH: "/api/bot",
-  REASON_TTL_SECONDS: 604800,
-  MAX_REASON_CHARS: 500,
-  MIN_REASON_WORDS: 10,
-  TIMEZONE: "Europe/Berlin",
-  DROP_PENDING_UPDATES_ON_DEV_START: false,
-  UPSTASH_REDIS_REST_URL: "https://example.com",
-  UPSTASH_REDIS_REST_TOKEN: "dummy_token",
-  JOIN_LINK: "https://example.com",
-};
+type Env = z.infer<z.ZodObject<typeof envSchema>>;
 
-let internalEnv: any = null;
-let isDummy = false;
+let _env: Env | undefined;
 
-export function initEnv(runtimeEnv: any = process.env) {
-  try {
-    internalEnv = createEnv({
-      server: envSchema,
-      runtimeEnv,
-      skipValidation: false,
-    });
-    isDummy = false;
-  } catch (error) {
-    const isEssentialMissing = !runtimeEnv.BOT_TOKEN || !runtimeEnv.UPSTASH_REDIS_REST_TOKEN;
-    if (isEssentialMissing) {
-      internalEnv = null;
-      isDummy = true;
-      return;
-    }
-    throw error;
-  }
+export function initEnv(runtimeEnv: Record<string, string | undefined> = process.env) {
+  _env = createEnv({
+    server: envSchema,
+    runtimeEnv,
+    skipValidation: false,
+    emptyStringAsUndefined: true,
+  });
 }
 
-export const env = new Proxy({} as any, {
-  get(_, prop: string) {
-    if (!internalEnv || isDummy) {
+export const env = new Proxy({} as Env, {
+  get(_, prop: string | symbol) {
+    if (!_env) {
       initEnv();
     }
-
-    if (isDummy) {
-      return defaultValues[prop];
-    }
-
-    return internalEnv[prop];
+    return _env![prop as keyof Env];
   },
 });
