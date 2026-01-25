@@ -131,7 +131,7 @@ Add all required environment variables in Vercel dashboard:
 After deployment, run the webhook setup script:
 
 ```bash
-bun run webhook-setup
+bun run set-webhook
 ```
 
 This will configure Telegram to send updates to your Vercel function.
@@ -152,14 +152,15 @@ This will configure Telegram to send updates to your Vercel function.
 
 ### Optional
 - `REASON_TTL_SECONDS`: Time-to-live for request state (default: `604800` = 7 days)
-- `MAX_REASON_LENGTH`: Maximum reason text length (default: `500`)
+- `MAX_REASON_CHARS`: Maximum reason text characters (default: `500`)
+- `MIN_REASON_WORDS`: Minimum number of words for reason (default: `15`)
 - `TIMEZONE`: Timezone for date formatting (default: `Europe/Berlin`)
 - `DROP_PENDING_UPDATES_ON_DEV_START`: Drop pending updates when starting dev mode (default: `false`)
-- `UPSTASH_REDIS_REST_URL`: Upstash Redis REST API URL (optional, recommended for production)
-- `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis REST API token (optional, recommended for production)
-- `JOIN_LINK`: Join link for the target channel/group (optional, used in error messages when requests are missing)
 
-**Note:** If Redis is not configured, the bot will use in-memory storage (data lost on restart). For production, configure Upstash Redis for persistent state across restarts.
+**Note:** Upstash Redis is required for production persistent state.
+- `UPSTASH_REDIS_REST_URL`: Upstash Redis REST API URL
+- `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis REST API token
+- `JOIN_LINK`: Join link for the target channel/group (required)
 
 ## Workflow
 
@@ -178,7 +179,7 @@ This will configure Telegram to send updates to your Vercel function.
 - `bun run start`: Start production server
 - `bun run build`: Compile TypeScript
 - `bun run type-check`: Type check without compilation
-- `bun run webhook-setup`: Set webhook for production mode
+- `bun run set-webhook`: Set webhook for production mode
 
 ## Project Structure
 

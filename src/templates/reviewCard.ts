@@ -100,7 +100,7 @@ export function formatReviewCardMessage(
   // Format additional messages if any
   const hasAdditionalMessages = data.additionalMessages && data.additionalMessages.length > 0;
   const additionalMessagesText = hasAdditionalMessages
-    ? `\n\n💬 Zusätzliche Nachrichten:\n${data.additionalMessages!.map((msg, idx) => `${idx + 1}. ${msg}`).join("\n")}`
+    ? `\n\n${data.additionalMessages!.join("\n\n")}`
     : "";
 
   // No escaping needed - sending as plain text (no parse_mode)

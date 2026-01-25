@@ -1,5 +1,6 @@
 import { setup, assign } from "xstate";
 import { env } from "../env";
+import { reasonSchema, additionalMessageSchema } from "../utils/validation";
 
 // Machine context type - exported for use in repository
 export interface JoinRequestContext {
@@ -45,13 +46,11 @@ export const joinRequestMachine = setup({
   guards: {
     isValidReason: ({ event }) => {
       if (event.type !== "SUBMIT_REASON") return false;
-      const reason = event.reason.trim();
-      return reason.length > 0 && reason.length <= env.MAX_REASON_LENGTH;
+      return reasonSchema.safeParse(event.reason).success;
     },
     isValidMessage: ({ event }) => {
       if (event.type !== "ADD_MESSAGE") return false;
-      const message = event.message.trim();
-      return message.length > 0 && message.length <= env.MAX_REASON_LENGTH;
+      return additionalMessageSchema.safeParse(event.message).success;
     },
     isReadyForDecision: ({ context }) => {
       return context.reason !== undefined;
@@ -65,15 +64,15 @@ export const joinRequestMachine = setup({
     },
   },
   actions: {
-    setReason: assign(({ event }) => {
+    setReason: assign(({ event }: { event: JoinRequestEvent }) => {
       if (event.type !== "SUBMIT_REASON") return {};
       return { reason: event.reason.trim() };
     }),
-    setAdminMsgId: assign(({ event }) => {
+    setAdminMsgId: assign(({ event }: { event: JoinRequestEvent }) => {
       if (event.type !== "SET_ADMIN_MSG_ID") return {};
       return { adminMsgId: event.adminMsgId };
     }),
-    addMessage: assign(({ context, event }) => {
+    addMessage: assign(({ context, event }: { context: JoinRequestContext; event: JoinRequestEvent }) => {
       if (event.type !== "ADD_MESSAGE") return {};
       return {
         additionalMessages: [
@@ -82,7 +81,7 @@ export const joinRequestMachine = setup({
         ],
       };
     }),
-    markApproved: assign(({ event }) => {
+    markApproved: assign(({ event }: { event: JoinRequestEvent }) => {
       if (event.type !== "APPROVE") return {};
       return {
         decision: {
@@ -93,7 +92,7 @@ export const joinRequestMachine = setup({
         },
       };
     }),
-    markDeclined: assign(({ event }) => {
+    markDeclined: assign(({ event }: { event: JoinRequestEvent }) => {
       if (event.type !== "DECLINE") return {};
       return {
         decision: {
@@ -107,7 +106,7 @@ export const joinRequestMachine = setup({
   },
 }).createMachine({
   id: "joinRequest",
-  context: ({ input }) => ({
+  context: ({ input }: { input: JoinRequestInput }) => ({
     ...input,
     reason: undefined,
     additionalMessages: [],

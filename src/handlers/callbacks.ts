@@ -3,11 +3,7 @@ import { isAdminInBothChats } from "../services/authz";
 import { joinRequestRepository } from "../repositories/JoinRequestRepository";
 import { updateReviewCard } from "../services/reviewCard";
 import { handleError, sendErrorToAdminGroup } from "./errors";
-
-const APPROVED_MESSAGE =
-  "✅ Congratulations! Your request to join has been approved!";
-const DECLINED_MESSAGE =
-  "❌ Unfortunately, your request to join was declined.";
+import { getMessage } from "../templates/messages";
 
 export function registerCallbackHandlers(bot: any): void {
   bot.on("callback_query:data", async (ctx: BotContext) => {
@@ -51,7 +47,7 @@ export function registerCallbackHandlers(bot: any): void {
       const request = await joinRequestRepository.findById(requestId);
       if (!request) {
         await ctx.answerCallbackQuery({
-          text: "Request not found or expired",
+          text: getMessage("request-not-found"),
           show_alert: true,
         });
         return;
@@ -62,7 +58,7 @@ export function registerCallbackHandlers(bot: any): void {
       // Check idempotency
       if (request.isProcessed()) {
         await ctx.answerCallbackQuery({
-          text: "This request has already been processed",
+          text: getMessage("request-processed"),
           show_alert: false,
         });
         return;
@@ -72,7 +68,7 @@ export function registerCallbackHandlers(bot: any): void {
       const isAuthorized = await isAdminInBothChats(bot, adminId);
       if (!isAuthorized) {
         await ctx.answerCallbackQuery({
-          text: "Not authorized. You must be an admin in both the target chat and admin review chat.",
+          text: getMessage("not-authorized"),
           show_alert: true,
         });
         return;
@@ -97,7 +93,7 @@ export function registerCallbackHandlers(bot: any): void {
 
           // Notify user
           try {
-            await bot.api.sendMessage(context.userId, APPROVED_MESSAGE);
+            await bot.api.sendMessage(context.userId, getMessage("approved-user"));
           } catch (userError) {
             console.error("Failed to notify user of approval:", userError);
           }
@@ -120,13 +116,13 @@ export function registerCallbackHandlers(bot: any): void {
           );
 
           await ctx.answerCallbackQuery({
-            text: "Request approved!",
+            text: getMessage("action-success-approved"),
             show_alert: false,
           });
         } catch (apiError) {
           await sendErrorToAdminGroup(bot, apiError, "approveChatJoinRequest");
           await ctx.answerCallbackQuery({
-            text: "Error approving request. Please try again.",
+            text: getMessage("error-approving"),
             show_alert: true,
           });
         }
@@ -148,7 +144,7 @@ export function registerCallbackHandlers(bot: any): void {
 
           // Notify user
           try {
-            await bot.api.sendMessage(context.userId, DECLINED_MESSAGE);
+            await bot.api.sendMessage(context.userId, getMessage("declined-user"));
           } catch (userError) {
             console.error("Failed to notify user of decline:", userError);
           }
@@ -171,13 +167,13 @@ export function registerCallbackHandlers(bot: any): void {
           );
 
           await ctx.answerCallbackQuery({
-            text: "Request declined!",
+            text: getMessage("action-success-declined"),
             show_alert: false,
           });
         } catch (apiError) {
           await sendErrorToAdminGroup(bot, apiError, "declineChatJoinRequest");
           await ctx.answerCallbackQuery({
-            text: "Error declining request. Please try again.",
+            text: getMessage("error-declining"),
             show_alert: true,
           });
         }

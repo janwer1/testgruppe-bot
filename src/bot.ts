@@ -1,192 +1,178 @@
-import { Bot, session } from "grammy";
-import { conversations, createConversation } from "@grammyjs/conversations";
-import { BotContext, SessionData } from "./types";
-import { collectReasonConversation } from "./conversations/collectReason";
+import { Bot } from "grammy";
+import { BotContext } from "./types";
 import { registerJoinRequestHandler } from "./handlers/joinRequest";
 import { registerCallbackHandlers } from "./handlers/callbacks";
 import { joinRequestRepository } from "./repositories/JoinRequestRepository";
 import { env } from "./env";
-import { sessionStorage } from "./services/sessionStorage";
 
 export function createBot(): Bot<BotContext> {
   const bot = new Bot<BotContext>(env.BOT_TOKEN);
 
-  // Session middleware with Redis storage (stateless for Vercel)
-  // User sessions are stored separately from domain entities
-  // Session only contains minimal metadata (requestId pointer)
-  // Reference: https://grammy.dev/ref/core/session
-  bot.use(
-    session({
-      initial: (): SessionData => ({}), // Required: prevents ctx.session from being undefined
-      storage: sessionStorage, // Uses custom Redis adapter compatible with @grammyjs/storage-redis
-      // Per-user sessions: use user ID as session key for all event types
-      // For chat_join_request, ctx.chatId is the group ID, not the user's DM
-      // For messages, ctx.chat.id is the user's DM chat ID (same as user ID in Telegram)
-      // Using ctx.from?.id ensures consistent session key across all event types
-      getSessionKey: (ctx) => {
-        // Use user ID for per-user sessions (works for both chat_join_request and messages)
-        // CRITICAL: When conversations middleware creates a new context, ctx.from might not be set
-        // but ctx.chat.id will be available (user's DM chat ID = user ID in Telegram)
-        // Priority order:
-        // 1. ctx.from.id (available in most updates)
-        // 2. ctx.chat.id for private chats (fallback when ctx.from is missing, e.g., in conversation contexts)
-        // 3. ctx.chatJoinRequest.from.id (for join request events)
-        
-        // Log all attempts to help debug
-        if (env.MODE === "dev") {
-          console.log(`[Session] getSessionKey called: ctx.from=${ctx.from?.id}, ctx.chat=${ctx.chat?.id} (${ctx.chat?.type}), chatJoinRequest=${ctx.chatJoinRequest?.from.id}`);
-        }
-        
-        if (ctx.from?.id) {
-          const key = String(ctx.from.id);
-          if (env.MODE === "dev") {
-            console.log(`[Session] getSessionKey: using ctx.from.id = ${key}`);
-          }
-          return key;
-        }
-        // CRITICAL FALLBACK: For private chats, ctx.chat.id equals the user ID
-        // This is essential for conversation contexts where ctx.from might not be set
-        // Grammy's conversations middleware may call getSessionKey with a context that only has ctx.chat
-        if (ctx.chat?.type === "private" && ctx.chat.id) {
-          const key = String(ctx.chat.id);
-          if (env.MODE === "dev") {
-            console.log(`[Session] getSessionKey: using ctx.chat.id (private) = ${key} [FALLBACK - ctx.from not available]`);
-          }
-          return key;
-        }
-        // For chat_join_request, use the user from the join request
-        if (ctx.chatJoinRequest?.from.id) {
-          const key = String(ctx.chatJoinRequest.from.id);
-          if (env.MODE === "dev") {
-            console.log(`[Session] getSessionKey: using ctx.chatJoinRequest.from.id = ${key}`);
-          }
-          return key;
-        }
-        // If no user ID can be determined, log and return undefined (session won't be initialized)
-        // This should rarely happen - most updates have ctx.from, ctx.chat (for private), or ctx.chatJoinRequest
-        if (env.MODE === "dev") {
-          console.warn(`[Session] Could not determine session key for update. ctx.from: ${ctx.from?.id}, ctx.chat: ${ctx.chat?.id} (${ctx.chat?.type}), chatJoinRequest: ${ctx.chatJoinRequest?.from.id}`);
-          console.warn(`[Session] Update type: ${ctx.update?.update_id}, available keys: ${Object.keys(ctx.update || {}).join(", ")}`);
-        }
-        return undefined;
-      },
-    })
-  );
+  // NOTE: Session middleware removed - it was unused.
+  // The stateless router loads all state from JoinRequestRepository.findByUserId()
+  // No need for Grammy sessions when domain state is fully persisted in Redis.
 
-  // Conversations middleware (requires session)
-  // This MUST run before any handlers that might enter conversations
-  // Grammy's middleware automatically routes messages to active conversations FIRST
-  bot.use(conversations());
-
-  // Register conversation FIRST so it's available when we try to restore
-  bot.use(createConversation(collectReasonConversation, "collectReason"));
-
-  // Handle messages from users with pending join requests (restore conversations from Redis)
-  // This runs AFTER conversation registration so we can enter it
-  // IMPORTANT: Grammy's conversations middleware runs FIRST and routes messages to conversations in Redis
-  // In a stateless environment, each request is independent - we check Redis session storage, not local state
-  // If a conversation exists in Redis, Grammy's middleware routes the message and this handler won't run
-  bot.use(async (ctx: BotContext, next) => {
-    // Only process text messages
-    if (!ctx.message || !("text" in ctx.message)) {
-      return next();
+  // Stateless Message Router
+  // Handles all user input without maintaining local conversation state
+  bot.on("message:text", async (ctx: BotContext) => {
+    // GUARD: Ensure context has necessary data (TS narrowing)
+    if (!ctx.chat || !ctx.from || !ctx.message || !ctx.message.text) {
+      return;
     }
 
-    const userId = ctx.from?.id;
-    if (!userId) return next();
+    // GUARD: Only accept messages from private chats
+    if (ctx.chat.type !== "private") {
+      return;
+    }
 
-    // If we reach here, Grammy's conversations middleware didn't route the message
-    // This means no conversation exists in Redis session storage for this user
-    // In a stateless environment, each request is independent - we check Redis, not local state
-    
-    // Check if request exists in Redis (fully stateless - no local state assumptions)
-    try {
-      const request = await joinRequestRepository.findByUserId(userId);
-      
-      if (request) {
-        const context = request.getContext();
-        
-        // Set session data (Grammy's session middleware will persist to Redis automatically)
-        // Session only stores pointers to domain entities
-        // Grammy's session middleware initializes ctx.session based on ctx.chatId
-        // If session is undefined, it means getSessionKey returned undefined (shouldn't happen for messages)
-        if (!ctx.session) {
-          console.error(`[Message Handler] Session not initialized for user ${userId}, chatId: ${ctx.chat?.id}`);
-          return next();
-        }
-        
-        ctx.session.requestId = context.requestId;
-        ctx.session.requestingUserId = context.userId;
-        ctx.session.targetChatId = context.targetChatId;
-        
-        // Try to enter conversation (will create new conversation in Redis if none exists)
-        // Grammy's conversations middleware manages conversation state in Redis session storage
-        try {
-          await ctx.conversation.enter("collectReason");
-          console.log(`[Message Handler] Successfully entered conversation for user ${userId}`);
-          // Conversation will handle the message, don't call next()
-          return;
-        } catch (error: any) {
-          // If conversation already exists in Redis, Grammy's middleware should have routed it
-          // But if we're here, something went wrong - log and let middleware handle it
-          const errorMessage = String(error?.message || error || "").toLowerCase();
-          const errorString = String(error || "").toLowerCase();
-          if (
-            errorMessage.includes("already active") ||
-            errorMessage.includes("conversation") ||
-            errorMessage.includes("already running") ||
-            errorString.includes("already active") ||
-            errorString.includes("conversation") ||
-            errorString.includes("already running")
-          ) {
-            // Conversation exists in Redis - Grammy's middleware should have routed it
-            // Pass through and let middleware handle it
-            return next();
-          }
-          // For other errors, log and let middleware try to handle it
-          console.error(`[Message Handler] Error entering conversation for user ${userId}:`, {
-            message: error?.message,
-            error: String(error),
-            errorType: error?.constructor?.name,
-          });
-          return next();
-        }
-      } else {
-        // No request found - user might be messaging after their request expired/was cleared
-        // Send helpful message with join link if available
-        console.log(`[Message Handler] No request found for user ${userId}, sending helpful message`);
-        try {
-          let message = "I don't have an active join request for you. ";
-          if (env.JOIN_LINK) {
-            message += `Please request to join again using this link: ${env.JOIN_LINK}`;
-          } else {
-            message += "Please request to join the channel/group again.";
-          }
-          await ctx.api.sendMessage(userId, message);
-        } catch (error) {
-          console.error(`[Message Handler] Failed to send message to user ${userId}:`, error);
-        }
-        // Don't process the message further
+    const userId = ctx.from.id;
+
+    // Load fresh state from Redis
+    // "Trust no one, load everything"
+    const request = await joinRequestRepository.findByUserId(userId);
+
+    if (!request) {
+      // No active request found
+      // Optional: check if they are sending a command or just chatting
+      // For now, we remain silent or send a help message if needed
+      // But to avoid spam, we'll just ignore or log in dev
+      if (env.MODE === "dev") {
+        console.log(`[Router] Ignored message from ${userId}: No active request`);
+      }
+      return;
+    }
+
+    // GUARD: Strict User ID matching (Should be guaranteed by findByUserId but good for safety)
+    if (request.getContext().userId !== userId) {
+      console.error(`[Router] Security Mismatch! Loaded request for ${request.getContext().userId} but msg from ${userId}`);
+      return;
+    }
+
+    // GUARD: Ensure request matches current configured target chat
+    // Prevents interaction with old requests from different deployments/configs
+    if (request.getContext().targetChatId !== env.TARGET_CHAT_ID) {
+      console.warn(`[Router] Target chat mismatch. Request: ${request.getContext().targetChatId}, Env: ${env.TARGET_CHAT_ID}`);
+      return;
+    }
+
+    // GUARD: Processed requests are final
+    if (request.isProcessed()) {
+      await ctx.reply("Request already processed");
+      return;
+    }
+
+    const text = ctx.message.text.trim();
+    const currentState = request.getState();
+
+    // ROUTE: collectingReason
+    if (currentState === "collectingReason") {
+      const { validateReason } = await import("./utils/validation");
+
+      const validation = validateReason(text);
+      if (!validation.success) {
+        await ctx.reply(validation.error || "Invalid input");
         return;
       }
-    } catch (error) {
-      console.error(`[Message Handler] Error checking request for user ${userId}:`, error);
+
+      const reason = validation.data!;
+
+      // Update State
+      request.submitReason(reason);
+      // PERSIST IMMEDIATELY: Ensure reason is saved even if posting to admin group fails
+      await joinRequestRepository.save(request);
+
+      // Post Review Card
+      const user = ctx.from;
+      const firstName = user.first_name || "User";
+      const lastName = user.last_name || "";
+      const userName = `${firstName}${lastName ? ` ${lastName}` : ""}`.trim();
+
+      const reviewCardData = {
+        userId: request.getContext().userId,
+        userName,
+        username: user.username,
+        reason,
+        timestamp: new Date(request.getContext().timestamp),
+        requestId: request.getContext().requestId,
+        additionalMessages: [],
+      };
+
+      const { postReviewCard } = await import("./services/reviewCard");
+      const adminMsgId = await postReviewCard(ctx.api, reviewCardData);
+
+      const { getMessage } = await import("./templates/messages");
+
+      if (adminMsgId) {
+        request.setAdminMsgId(adminMsgId);
+        await joinRequestRepository.save(request); // Save adminMsgId
+
+        await ctx.reply(getMessage("thank-you"));
+      } else {
+        console.error(`[Router] Failed to post review card for user ${userId}`);
+        await ctx.reply("Your request has been saved, but we couldn't notify the admins immediately. We will review it shortly.");
+      }
+      return;
     }
 
-    return next();
+    // ROUTE: awaitingReview
+    if (currentState === "awaitingReview") {
+      // Cutoff check strictly via isProcessed (already checked above, but valid re-check if logic changes)
+      if (request.isProcessed()) {
+        await ctx.reply("Request already processed");
+        return;
+      }
+
+      const { validateAdditionalMessage } = await import("./utils/validation");
+      const validation = validateAdditionalMessage(text);
+
+      if (!validation.success) {
+        // Silent fail or soft warn? Let's warn softly
+        await ctx.reply(validation.error || "Message too short/long");
+        return;
+      }
+
+      const message = validation.data!;
+
+      // Update State
+      request.addMessage(message);
+      await joinRequestRepository.save(request); // PERSIST IMMEDIATELY
+
+      const { getMessage } = await import("./templates/messages");
+
+      // Update Admin Card
+      const context = request.getContext();
+      if (context.adminMsgId) {
+        try {
+          const { appendMessageToReviewCard } = await import("./services/reviewCard");
+          const reviewCardData = {
+            userId: context.userId,
+            userName: context.userName,
+            username: context.username,
+            reason: context.reason || "",
+            timestamp: new Date(context.timestamp),
+            requestId: context.requestId,
+            additionalMessages: context.additionalMessages,
+          };
+
+          await appendMessageToReviewCard(ctx.api, context.adminMsgId, reviewCardData);
+        } catch (error) {
+          console.error(`[Router] Failed to update admin card for user ${userId}:`, error);
+        }
+      } else {
+        console.warn(`[Router] Message added but no adminMsgId for user ${userId}`);
+      }
+
+      await ctx.reply(getMessage("msg-added"));
+      return;
+    }
   });
 
-  // Debug: Log all incoming messages (only in dev mode)
+  // Debug: Log private text messages only (in dev mode)
+  // Avoids noisy logs from supergroup messages
   if (env.MODE === "dev") {
-    bot.on("message", async (ctx) => {
-      console.log(`[Debug] Received message from user ${ctx.from?.id} in chat ${ctx.chat.id}: ${ctx.message?.text?.substring(0, 50) || "non-text"}`);
-      // Check if conversation is active for this user
-      try {
-        // This is just for debugging - we can't directly check, but we can log
-        console.log(`[Debug] Message handler will check for active conversation`);
-      } catch (e) {
-        // Ignore
-      }
+    bot.on("message:text", async (ctx: BotContext) => {
+      if (!ctx.chat || ctx.chat.type !== "private") return;
+      console.log(`[Debug] Private DM from ${ctx.from?.id}: ${ctx.message?.text?.substring(0, 50)}`);
     });
   }
 

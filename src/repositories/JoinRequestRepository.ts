@@ -14,8 +14,7 @@ export interface IJoinRequestRepository {
 
 /**
  * Repository implementation for domain persistence
- * Handles long-term storage of JoinRequest entities
- * User sessions are managed separately by Grammy's session middleware
+ * Handles long-term storage of JoinRequest entities in Redis
  */
 export class JoinRequestRepository implements IJoinRequestRepository {
   /**
@@ -24,10 +23,10 @@ export class JoinRequestRepository implements IJoinRequestRepository {
    */
   async create(input: JoinRequestInput): Promise<JoinRequest> {
     const request = new JoinRequest(input);
-    
-    // Set user active request pointer (domain persistence, not session state)
+
+    // Set user active request pointer (domain persistence)
     await stateStore.setUserActiveRequest(input.userId, input.requestId);
-    
+
     // Save initial state (will be in "pending" state)
     await this.save(request);
 
@@ -55,11 +54,11 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       timestamp: state.timestamp,
       decision: state.decisionStatus
         ? {
-            status: state.decisionStatus,
-            adminId: state.decisionAdminId || 0,
-            adminName: state.decisionAdminName || "Unknown",
-            at: state.decisionAt || state.timestamp,
-          }
+          status: state.decisionStatus,
+          adminId: state.decisionAdminId || 0,
+          adminName: state.decisionAdminName || "Unknown",
+          at: state.decisionAt || state.timestamp,
+        }
         : undefined,
     };
 
@@ -111,7 +110,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     await stateStore.set(context.requestId, requestState);
 
     // Manage user -> requestId pointer for domain lookup
-    // This is domain persistence, not session state (session only stores requestId pointer)
+    // This is domain persistence (request state and user pointer in Redis)
     if (state === "collectingReason" || state === "awaitingReview") {
       // Keep pointer for active requests
       await stateStore.setUserActiveRequest(context.userId, context.requestId);

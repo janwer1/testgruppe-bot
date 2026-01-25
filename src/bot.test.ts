@@ -85,21 +85,6 @@ test("should handle final states (approved/declined) correctly", () => {
   expect(shouldSkipDeclined).toBe(false);
 });
 
-test("should restore session data when request is found", () => {
-  const request = createRequestInState("collectingReason", "req-6");
-  const context = request.getContext();
-
-  // Simulate session restoration
-  const sessionData = {
-    requestId: context.requestId,
-    requestingUserId: context.userId,
-    targetChatId: context.targetChatId,
-  };
-
-  expect(sessionData.requestId).toBe("req-6");
-  expect(sessionData.requestingUserId).toBe(12345);
-  expect(sessionData.targetChatId).toBe(-1001234567890);
-});
 
 test("should correctly identify states that require conversation entry", () => {
   const states = ["pending", "collectingReason", "awaitingReview", "approved", "declined"];

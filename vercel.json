@@ -1,9 +1,20 @@
 {
   "functions": {
     "api/bot.ts": {
-      "memory": 1024,
       "maxDuration": 30
+    },
+    "api/index.ts": {
+      "maxDuration": 5
     }
   },
-  "outputDirectory": "."
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/api",
+      "destination": "/api/index"
+    }
+  ]
 }

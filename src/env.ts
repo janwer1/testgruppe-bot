@@ -30,7 +30,6 @@ export const env = createEnv({
         return num;
       }),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-    // Prod only
     PUBLIC_BASE_URL: z
       .string()
       .refine((val: string) => {
@@ -42,18 +41,17 @@ export const env = createEnv({
         }
       }, "PUBLIC_BASE_URL must be a valid URL")
       .optional(),
-    WEBHOOK_PATH: z.string().optional(),
+    WEBHOOK_PATH: z.string().default("/api/bot"),
     WEBHOOK_SECRET_TOKEN: z.string().optional(),
-    // Optional
-    REASON_TTL_SECONDS: z.coerce.number().int().positive().default(604800), // 7 days (was 3600 = 1 hour)
-    MAX_REASON_LENGTH: z.coerce.number().int().positive().default(500),
+    REASON_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
+    MAX_REASON_CHARS: z.coerce.number().int().positive().default(500),
+    MIN_REASON_WORDS: z.coerce.number().int().positive().default(15),
     TIMEZONE: z.string().default("Europe/Berlin"),
     DROP_PENDING_UPDATES_ON_DEV_START: z
       .string()
       .transform((val: string) => val === "true")
       .pipe(z.boolean())
       .default(false),
-    // Redis (optional for dev, recommended for prod)
     UPSTASH_REDIS_REST_URL: z
       .string()
       .refine((val: string) => {
@@ -63,10 +61,8 @@ export const env = createEnv({
         } catch {
           return false;
         }
-      }, "UPSTASH_REDIS_REST_URL must be a valid URL")
-      .optional(),
-    UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
-    // Join link for the target channel/group (optional, used in error messages)
+      }, "UPSTASH_REDIS_REST_URL must be a valid URL"),
+    UPSTASH_REDIS_REST_TOKEN: z.string(),
     JOIN_LINK: z
       .string()
       .refine((val: string) => {
@@ -76,8 +72,7 @@ export const env = createEnv({
         } catch {
           return false;
         }
-      }, "JOIN_LINK must be a valid URL")
-      .optional(),
+      }, "JOIN_LINK must be a valid URL"),
   },
   runtimeEnv: process.env,
   skipValidation: false,
