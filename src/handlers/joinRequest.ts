@@ -90,6 +90,8 @@ export function registerJoinRequestHandler(bot: any): void {
       }
     } catch (error) {
       await handleError(ctx, error, "joinRequest");
+      // Re-throw error to force Telegram to retry the webhook
+      throw error;
     }
   });
 }

@@ -5,7 +5,7 @@ import { env, initEnv } from "./env";
 import { BotContext } from "./types";
 
 let bot: Bot<BotContext>;
-let handler: ReturnType<typeof webhookCallback>;
+let handler: (req: Request) => Promise<Response>;
 
 function getBotAndHandler() {
     if (!bot) {
