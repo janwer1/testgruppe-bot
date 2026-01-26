@@ -5,6 +5,16 @@ async function main() {
     // Import env - our new Proxy in env.ts will handle loading .env via dotenv/config
     const { env } = await import("../env");
 
+    // GUARD: Only run automatically in CI (Cloudflare Pages/Workers build) or if explicitly forced
+    // This prevents local 'bun install' from accidentally setting production webhooks
+    const isCI = process.env.CI === "true" || process.env.CF_PAGES === "1";
+    const isForced = process.argv.includes("--force");
+
+    if (!isCI && !isForced) {
+      console.log("ℹ️ Skipping webhook setup (not running in CI). Use --force to override.");
+      process.exit(0); // Exit successfully to not break install
+    }
+
     // Check if we have the minimum required to set a webhook
     if (!env.BOT_TOKEN) {
       console.error("❌ BOT_TOKEN is missing from environment");
