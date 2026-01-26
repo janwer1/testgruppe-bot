@@ -9,6 +9,7 @@ export interface IJoinRequestRepository {
   create(input: JoinRequestInput): Promise<JoinRequest>;
   findById(requestId: string): Promise<JoinRequest | undefined>;
   findByUserId(userId: number): Promise<JoinRequest | undefined>;
+  findRecent(limit?: number): Promise<JoinRequest[]>;
   save(request: JoinRequest): Promise<void>;
 }
 
@@ -19,15 +20,17 @@ export interface IJoinRequestRepository {
 export class JoinRequestRepository implements IJoinRequestRepository {
   /**
    * Create a new join request
-   * Sets up the user -> requestId pointer for domain lookup
    */
   async create(input: JoinRequestInput): Promise<JoinRequest> {
     const request = new JoinRequest(input);
 
-    // Set user active request pointer (domain persistence)
+    // Link user to this request ID
     await stateStore.setUserActiveRequest(input.userId, input.requestId);
 
-    // Save initial state (will be in "pending" state)
+    // Add to timeline for admin listing
+    await stateStore.addToTimeline(input.requestId, input.timestamp);
+
+    // Persist initial state
     await this.save(request);
 
     return request;
@@ -67,29 +70,34 @@ export class JoinRequestRepository implements IJoinRequestRepository {
 
   /**
    * Find request by user ID
-   * Uses simple pointer lookup: user:${userId}:activeRequest -> requestId
    */
   async findByUserId(userId: number): Promise<JoinRequest | undefined> {
-    // Get active request ID pointer for this user (domain persistence)
     const requestId = await stateStore.getActiveRequestIdByUserId(userId);
     if (!requestId) {
       return undefined;
     }
 
-    // Load the full request entity by ID
     return this.findById(requestId);
   }
 
   /**
-   * Save request state (domain persistence)
-   * Serializes the full context including decision object with adminId/adminName
-   * Manages user -> requestId pointer for domain lookup
+   * Find recent requests
+   */
+  async findRecent(limit: number = 10): Promise<JoinRequest[]> {
+    const requestIds = await stateStore.getRecentRequests(limit);
+    const requests = await Promise.all(requestIds.map((id) => this.findById(id)));
+    // Filter out undefined results (in case of expired/missing data)
+    return requests.filter((r): r is JoinRequest => r !== undefined);
+  }
+
+  /**
+   * Save request state
    */
   async save(request: JoinRequest): Promise<void> {
     const context = request.getContext();
     const state = request.getState();
 
-    // Serialize full context to RequestState (includes decision object)
+    // Serialize full context
     const requestState: RequestState = {
       targetChatId: context.targetChatId,
       userId: context.userId,
@@ -99,7 +107,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       username: context.username,
       timestamp: context.timestamp,
       additionalMessages: context.additionalMessages,
-      // Persist decision object with adminId and adminName (never lose audit data)
+      // Include decision details
       decisionStatus: context.decision?.status,
       decisionAdminId: context.decision?.adminId,
       decisionAdminName: context.decision?.adminName,
@@ -109,13 +117,11 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     // Save the request entity
     await stateStore.set(context.requestId, requestState);
 
-    // Manage user -> requestId pointer for domain lookup
-    // This is domain persistence (request state and user pointer in Redis)
+    // Update active request pointer based on state
     if (state === "collectingReason" || state === "awaitingReview") {
-      // Keep pointer for active requests
       await stateStore.setUserActiveRequest(context.userId, context.requestId);
     } else if (state === "approved" || state === "declined") {
-      // Clear pointer when request is finalized (markProcessed equivalent)
+      // Clear pointer for finalized requests
       await stateStore.clearUserActiveRequest(context.userId);
     }
   }

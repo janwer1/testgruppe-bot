@@ -5,6 +5,7 @@ import { handleError } from "./errors";
 import type { JoinRequestInput } from "../domain/joinRequestMachine";
 import { getMessage } from "../templates/messages";
 import { env } from "../env";
+import { ulid } from "@std/ulid";
 
 export function registerJoinRequestHandler(bot: any): void {
   bot.on("chat_join_request", async (ctx: BotContext) => {
@@ -17,10 +18,9 @@ export function registerJoinRequestHandler(bot: any): void {
       const targetChatId = joinRequest.chat.id;
       const user = joinRequest.from;
 
-      // Generate unique request ID
-      const requestId = Array.from(crypto.getRandomValues(new Uint8Array(8)))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
+      // Generate unique request ID using ULID (Universally Unique Lexicographically Sortable Identifier)
+      // This allows sorting by ID to equate to sorting by time
+      const requestId = ulid();
       const userName = `${user.first_name}${user.last_name ? ` ${user.last_name}` : ""}`;
 
       // NOTE: Session middleware was removed - all state is persisted via JoinRequestRepository

@@ -33,10 +33,12 @@ export function registerCallbackHandlers(bot: any): void {
       return;
     }
 
-    // Validate requestId format (should be hex string, 16 chars from randomBytes(8))
-    if (!requestId || !/^[a-f0-9]{16}$/.test(requestId)) {
+    // Validate requestId format: ULID (26 chars Base32)
+    const isUlid = /^[0-9A-Z]{26}$/i.test(requestId);
+
+    if (!requestId || !isUlid) {
       await ctx.answerCallbackQuery({
-        text: "Invalid request ID format",
+        text: `Invalid request ID format: ${requestId}`,
         show_alert: true,
       });
       return;

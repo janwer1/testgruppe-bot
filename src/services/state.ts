@@ -23,6 +23,8 @@ interface StateStoreInterface {
   setUserActiveRequest(userId: number, requestId: string): Promise<void>;
   clearUserActiveRequest(userId: number): Promise<void>;
   getActiveRequestIdByUserId(userId: number): Promise<string | undefined>;
+  addToTimeline(requestId: string, timestamp: number): Promise<void>;
+  getRecentRequests(limit: number): Promise<string[]>;
 }
 
 // Redis-backed state store (production)
@@ -48,6 +50,10 @@ class RedisStateStore implements StateStoreInterface {
 
   private userActiveRequestKey(userId: number): string {
     return `user:${userId}:activeRequest`;
+  }
+
+  private timelineKey(): string {
+    return "requests:timeline";
   }
 
   async set(requestId: string, state: RequestState): Promise<void> {
@@ -100,19 +106,50 @@ class RedisStateStore implements StateStoreInterface {
       return undefined;
     }
   }
+
+  async addToTimeline(requestId: string, timestamp: number): Promise<void> {
+    try {
+      // Use score 0 to rely on lexicographical sorting of members.
+      // Since members are ULIDs (time-ordered strings), this sorts by time.
+      await this.redis.zadd(this.timelineKey(), { score: 0, member: requestId });
+      // Trim timeline to keep only recent 1000 requests.
+      // For lexicographical sorting (all scores 0), Redis sorts A-Z.
+      // zrange 0 -1 returns oldest first.
+      // zremrangebyrank 0 -1001 removes "all but last 1000 items".
+      // This logic remains correct for score=0 + ULID.
+      await this.redis.zremrangebyrank(this.timelineKey(), 0, -1001);
+    } catch (error) {
+      console.error(`[RedisStateStore] Error adding to timeline for request ${requestId}:`, error);
+    }
+  }
+
+  async getRecentRequests(limit: number): Promise<string[]> {
+    try {
+      // Get the most recent requests.
+      // With score 0, ZRANGE ... REV gives us Reverse Lexicographical order (Z-A).
+      // Since ULIDs grow alphabetically over time, Z is newest.
+      // So this returns newest requests first.
+      const result = await this.redis.zrange(this.timelineKey(), 0, limit - 1, { rev: true });
+      return result as string[];
+    } catch (error) {
+      console.error("[RedisStateStore] Error getting recent requests:", error);
+      return [];
+    }
+  }
 }
 
 // In-memory state store (development fallback)
 class MemoryStateStore implements StateStoreInterface {
   private store: Map<string, RequestState> = new Map();
   private userActiveRequests: Map<number, string> = new Map(); // userId -> requestId
+  private timeline: Array<{ requestId: string; timestamp: number }> = [];
   private ttl: number;
 
   constructor() {
     this.ttl = (env.REASON_TTL_SECONDS || 604800) * 1000; // Convert to milliseconds
     // Clean up expired entries every 5 minutes
     if (typeof setInterval !== 'undefined') {
-        setInterval(() => this.cleanup(), 5 * 60 * 1000);
+      setInterval(() => this.cleanup(), 5 * 60 * 1000);
     }
   }
 
@@ -162,6 +199,19 @@ class MemoryStateStore implements StateStoreInterface {
     return requestId;
   }
 
+  async addToTimeline(requestId: string, timestamp: number): Promise<void> {
+    this.timeline.push({ requestId, timestamp });
+    // Sort by requestId descending (since ULID matches time)
+    this.timeline.sort((a, b) => b.requestId.localeCompare(a.requestId));
+    if (this.timeline.length > 1000) {
+      this.timeline = this.timeline.slice(0, 1000);
+    }
+  }
+
+  async getRecentRequests(limit: number): Promise<string[]> {
+    return this.timeline.slice(0, limit).map((t) => t.requestId);
+  }
+
   private cleanup(): void {
     const now = Date.now();
     for (const [requestId, state] of this.store.entries()) {
@@ -169,15 +219,20 @@ class MemoryStateStore implements StateStoreInterface {
         this.store.delete(requestId);
       }
     }
-      // Clean up expired user active request mappings
-      for (const [userId, requestId] of this.userActiveRequests.entries()) {
-        const state = this.store.get(this.requestKey(requestId));
-        if (!state || now - state.timestamp > this.ttl || state.decisionStatus) {
-          this.userActiveRequests.delete(userId);
-        }
+    // Clean up expired user active request mappings
+    for (const [userId, requestId] of this.userActiveRequests.entries()) {
+      const state = this.store.get(this.requestKey(requestId));
+      if (!state || now - state.timestamp > this.ttl || state.decisionStatus) {
+        this.userActiveRequests.delete(userId);
       }
     }
+    // Clean up timeline
+    this.timeline = this.timeline.filter((item) => {
+      const state = this.store.get(item.requestId);
+      return state && now - state.timestamp <= this.ttl;
+    });
   }
+}
 
 // Create state store based on environment
 let stateStore: StateStoreInterface;

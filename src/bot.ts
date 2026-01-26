@@ -2,18 +2,32 @@ import { Bot } from "grammy";
 import { BotContext } from "./types";
 import { registerJoinRequestHandler } from "./handlers/joinRequest";
 import { registerCallbackHandlers } from "./handlers/callbacks";
+import { registerAdminHandlers } from "./handlers/admin";
 import { joinRequestRepository } from "./repositories/JoinRequestRepository";
 import { env } from "./env";
+import { logger } from "./services/logger";
 
 export function createBot(): Bot<BotContext> {
   const bot = new Bot<BotContext>(env.BOT_TOKEN);
 
-  // NOTE: Session middleware removed - it was unused.
-  // The stateless router loads all state from JoinRequestRepository.findByUserId()
-  // No need for Grammy sessions when domain state is fully persisted in Redis.
+  // Stateless architecture: Loads state from Redis on every request.
 
-  // Stateless Message Router
-  // Handles all user input without maintaining local conversation state
+  // Request logging middleware
+  bot.use(async (ctx, next) => {
+    // Only log strictly interesting events
+    if (ctx.chat?.type === "private" && ctx.message?.text) {
+      logger.info({
+        userId: ctx.from?.id,
+        text: ctx.message.text,
+      }, "Private Message Received");
+    }
+    await next();
+  });
+
+  // Register Admin handlers first to intercept commands.
+  registerAdminHandlers(bot);
+
+  // Message Router: Handles user input based on their current request state.
   bot.on("message:text", async (ctx: BotContext) => {
     // GUARD: Ensure context has necessary data (TS narrowing)
     if (!ctx.chat || !ctx.from || !ctx.message || !ctx.message.text) {
@@ -27,29 +41,22 @@ export function createBot(): Bot<BotContext> {
 
     const userId = ctx.from.id;
 
-    // Load fresh state from Redis
-    // "Trust no one, load everything"
+    // Load active request state
     const request = await joinRequestRepository.findByUserId(userId);
 
     if (!request) {
-      // No active request found
-      // Optional: check if they are sending a command or just chatting
-      // For now, we remain silent or send a help message if needed
-      // But to avoid spam, we'll just ignore or log in dev
       if (env.MODE === "dev") {
         console.log(`[Router] Ignored message from ${userId}: No active request`);
       }
       return;
     }
 
-    // GUARD: Strict User ID matching (Should be guaranteed by findByUserId but good for safety)
+    // Verify security: Request must belong to message sender
     if (request.getContext().userId !== userId) {
       console.error(`[Router] Security Mismatch! Loaded request for ${request.getContext().userId} but msg from ${userId}`);
       return;
     }
 
-    // GUARD: Ensure request matches current configured target chat
-    // Prevents interaction with old requests from different deployments/configs
     if (request.getContext().targetChatId !== env.TARGET_CHAT_ID) {
       console.warn(`[Router] Target chat mismatch. Request: ${request.getContext().targetChatId}, Env: ${env.TARGET_CHAT_ID}`);
       return;
@@ -116,11 +123,6 @@ export function createBot(): Bot<BotContext> {
 
     // ROUTE: awaitingReview
     if (currentState === "awaitingReview") {
-      // Cutoff check strictly via isProcessed (already checked above, but valid re-check if logic changes)
-      if (request.isProcessed()) {
-        await ctx.reply("Request already processed");
-        return;
-      }
 
       const { validateAdditionalMessage } = await import("./utils/validation");
       const validation = validateAdditionalMessage(text);
@@ -167,16 +169,9 @@ export function createBot(): Bot<BotContext> {
     }
   });
 
-  // Debug: Log private text messages only (in dev mode)
-  // Avoids noisy logs from supergroup messages
-  if (env.MODE === "dev") {
-    bot.on("message:text", async (ctx: BotContext) => {
-      if (!ctx.chat || ctx.chat.type !== "private") return;
-      console.log(`[Debug] Private DM from ${ctx.from?.id}: ${ctx.message?.text?.substring(0, 50)}`);
-    });
-  }
 
-  // Register handlers
+
+  // Register other handlers
   registerJoinRequestHandler(bot);
   registerCallbackHandlers(bot);
 
