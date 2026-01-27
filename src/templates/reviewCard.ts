@@ -1,8 +1,11 @@
 import type { ReviewCardData } from "../services/reviewCard";
-import { formatDateWithTimezone } from "../utils/date";
+import { formatDate } from "../utils/date";
 
 export function formatReviewCardMessage(data: ReviewCardData, timezone: string): string {
-  const dateStr = formatDateWithTimezone(new Date(data.timestamp), timezone);
+  const dateStr = formatDate(new Date(data.timestamp), timezone, {
+    includeYear: true,
+    includeTimeZoneName: true,
+  });
   const userHandle = data.username ? ` (@${data.username})` : "";
 
   let additionalStr = "";

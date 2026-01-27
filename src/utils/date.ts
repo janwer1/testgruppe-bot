@@ -1,16 +1,29 @@
-export function formatDateWithTimezone(date: Date, timezone: string): string {
+interface DateFormatOptions {
+  includeYear?: boolean;
+  includeTimeZoneName?: boolean;
+}
+
+/**
+ * Format date with timezone
+ * @param date - Date object or timestamp
+ * @param timezone - IANA timezone string (e.g., "Europe/Berlin")
+ * @param options - Format options
+ */
+export function formatDate(date: Date | number, timezone: string, options: DateFormatOptions = {}): string {
+  const { includeYear = false, includeTimeZoneName = false } = options;
+  const dateObj = date instanceof Date ? date : new Date(date);
+
   try {
-    const formatter = new Intl.DateTimeFormat("de-DE", {
+    return dateObj.toLocaleString("de-DE", {
       timeZone: timezone,
-      year: "numeric",
+      ...(includeYear && { year: "numeric" }),
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
       minute: "2-digit",
-      timeZoneName: "short",
+      ...(includeTimeZoneName && { timeZoneName: "short" }),
     });
-    return formatter.format(date);
   } catch (_error) {
-    return date.toISOString();
+    return dateObj.toISOString();
   }
 }
