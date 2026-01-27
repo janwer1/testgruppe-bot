@@ -36,7 +36,7 @@ export default {
           const repo = new JoinRequestRepository(store, config);
           bot = createBot(config, repo);
           handler = webhookCallback(bot, "std/http", {
-            secretToken: config.webhookSecret,
+            secretToken: config.webhookSecretToken,
           });
         }
 

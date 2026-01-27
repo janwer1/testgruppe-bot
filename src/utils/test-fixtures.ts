@@ -10,7 +10,7 @@ export const mockConfig: BotConfig = {
   timezone: "UTC",
   webhookPath: "/api/bot" as const,
   webhookUrl: "https://test.com",
-  webhookSecret: "secret",
+  webhookSecretToken: "secret",
   adminReviewChatId: -1002,
   upstashRedisRestUrl: "https://redis",
   upstashRedisRestToken: "token",

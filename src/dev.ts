@@ -41,7 +41,7 @@ async function main() {
       console.log(`🔄 Restoring webhook to: ${webhookUrl}`);
       try {
         await bot.api.setWebhook(webhookUrl, {
-          secret_token: config.webhookSecret,
+          secret_token: config.webhookSecretToken,
           drop_pending_updates: false,
         });
         console.log("✅ Webhook restored.");

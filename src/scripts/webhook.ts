@@ -35,9 +35,7 @@ async function getWebhook() {
 async function setupWebhook(force = false) {
   const { parseEnv } = await import("../env");
   const { createConfigFromEnv } = await import("../config");
-  const { createStateStore } = await import("../services/state");
-  const { JoinRequestRepository } = await import("../repositories/JoinRequestRepository");
-  const { createBot } = await import("../bot");
+  const { Bot } = await import("grammy");
 
   const isCI = process.env.CI === "true" || process.env.CF_PAGES === "1";
 
@@ -49,28 +47,31 @@ async function setupWebhook(force = false) {
   const env = parseEnv();
   const config = createConfigFromEnv(env);
 
-  if (!config.botToken || !config.webhookUrl) {
+  if (!config.botToken || !config.webhookUrl || !config.webhookSecretToken) {
     if (isCI) {
-      throw new Error("❌ CI Environment: BOT_TOKEN or PUBLIC_BASE_URL is missing. Webhook setup failed.");
+      throw new Error(
+        "❌ CI Environment: BOT_TOKEN, PUBLIC_BASE_URL, or WEBHOOK_SECRET_TOKEN is missing. Webhook setup failed.",
+      );
     }
-    console.log("ℹ️ Skipping webhook setup (Missing BOT_TOKEN or PUBLIC_BASE_URL)");
+    console.log("ℹ️ Skipping webhook setup: BOT_TOKEN, PUBLIC_BASE_URL, or WEBHOOK_SECRET_TOKEN is missing.");
     return;
   }
 
-  const store = createStateStore(config);
-  const repo = new JoinRequestRepository(store, config);
-  const bot = createBot(config, repo);
+  const bot = new Bot(config.botToken);
 
   if (!config.webhookUrl) {
     throw new Error("PUBLIC_BASE_URL (webhookUrl) is missing");
   }
 
   const webhookUrl = new URL(config.webhookPath, config.webhookUrl).toString();
+  const maskedSecret =
+    config.webhookSecretToken.substring(0, 3) + "*".repeat(Math.max(0, config.webhookSecretToken.length - 3));
 
   console.log(`🚀 Setting webhook to: ${webhookUrl}`);
+  console.log(`🔒 Using secret token: ${maskedSecret}`);
 
   const result = await bot.api.setWebhook(webhookUrl, {
-    secret_token: config.webhookSecret,
+    secret_token: config.webhookSecretToken,
     drop_pending_updates: true,
   });
 
@@ -95,7 +96,7 @@ async function testWebhook() {
   const url = new URL(config.webhookPath, baseUrl).toString();
 
   console.log(`🚀 Simulating Telegram webhook call to: ${url}`);
-  if (!config.webhookSecret) {
+  if (!config.webhookSecretToken) {
     console.warn("⚠️  Warning: WEBHOOK_SECRET_TOKEN is not set in env");
   }
 
@@ -119,7 +120,7 @@ async function testWebhook() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Telegram-Bot-Api-Secret-Token": config.webhookSecret || "",
+      "X-Telegram-Bot-Api-Secret-Token": config.webhookSecretToken!, // Guaranteed to be defined by validation above
     },
     body: JSON.stringify(payload),
   });
