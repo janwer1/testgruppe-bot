@@ -10,7 +10,7 @@ export interface RequestState {
   username?: string;
   timestamp: number;
   additionalMessages: string[]; // Always initialized, never optional
-  // Decision fields (replaces processed boolean)
+  // Decision fields
   decisionStatus?: "approved" | "declined";
   decisionAdminId?: number;
   decisionAdminName?: string;
@@ -27,7 +27,6 @@ interface StateStoreInterface {
   getRecentRequests(limit: number): Promise<string[]>;
 }
 
-// Redis-backed state store (production)
 class RedisStateStore implements StateStoreInterface {
   private redis: Redis;
   private ttl: number;
@@ -138,7 +137,6 @@ class RedisStateStore implements StateStoreInterface {
   }
 }
 
-// In-memory state store (development fallback)
 class MemoryStateStore implements StateStoreInterface {
   private store: Map<string, RequestState> = new Map();
   private userActiveRequests: Map<number, string> = new Map(); // userId -> requestId
@@ -234,10 +232,7 @@ class MemoryStateStore implements StateStoreInterface {
   }
 }
 
-// Create state store based on environment
 let stateStore: StateStoreInterface;
-
-// If we are in test mode OR Redis is not configured, use MemoryStateStore
 const isTest = process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test";
 const hasRedisConfig = !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN && !env.UPSTASH_REDIS_REST_URL.includes("example.com"));
 

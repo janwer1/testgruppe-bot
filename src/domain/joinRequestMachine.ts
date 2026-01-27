@@ -1,7 +1,6 @@
 import { setup, assign } from "xstate";
 import { validateReason, validateAdditionalMessage } from "../utils/validation";
 
-// Machine context type - exported for use in repository
 export interface JoinRequestContext {
   requestId: string;
   userId: number;
@@ -9,12 +8,12 @@ export interface JoinRequestContext {
   userName: string;
   username?: string;
   reason?: string;
-  additionalMessages: string[]; // Always initialized, never optional
+  additionalMessages: string[];
   adminMsgId?: number;
   timestamp: number;
   decision?: {
     status: "approved" | "declined";
-    adminId: number; // Store admin ID for auditability
+    adminId: number;
     adminName: string;
     at: number;
   };

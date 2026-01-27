@@ -23,8 +23,7 @@ export function registerJoinRequestHandler(bot: any): void {
       const requestId = ulid();
       const userName = `${user.first_name}${user.last_name ? ` ${user.last_name}` : ""}`;
 
-      // NOTE: Session middleware was removed - all state is persisted via JoinRequestRepository
-      // The stateless router loads state fresh from Redis on each request
+      // Stateless architecture: all state is persisted via JoinRequestRepository
 
       console.log(`[Join Request] User ${userId} requested to join. Request ID: ${requestId}`);
 
@@ -49,8 +48,6 @@ export function registerJoinRequestHandler(bot: any): void {
       try {
         console.log(`[Join Request] Sending welcome DM to user ${userId}...`);
 
-        // Use user_chat_id from the join request update itself if available (guaranteed to work)
-        // Fallback to userId (which assumes a private chat exists)
         const recipientId = joinRequest.user_chat_id || userId;
 
         await ctx.api.sendMessage(
@@ -58,7 +55,6 @@ export function registerJoinRequestHandler(bot: any): void {
           getMessage("welcome", { minWords: env.MIN_REASON_WORDS })
         );
       } catch (dmError) {
-        // User may have blocked bot or privacy settings prevent DMs
         console.error("Failed to send DM to user:", dmError);
 
         const failureReason = getMessage("dm-failed");
@@ -76,8 +72,6 @@ export function registerJoinRequestHandler(bot: any): void {
 
         const adminMsgId = await postReviewCard(ctx.api, reviewCardData);
         if (adminMsgId) {
-          // Update request with reason and adminMsgId via domain model
-          // Note: we can submit reason even if we didn't start collection? 
           // Domain model requires "collectingReason" state for submitReason.
           // Since we called startCollection() above, we are good.
           request.submitReason(failureReason);

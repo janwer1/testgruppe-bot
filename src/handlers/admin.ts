@@ -5,9 +5,7 @@ import { env } from "../env";
 
 export function registerAdminHandlers(bot: Bot<BotContext>): void {
     bot.command("admin", async (ctx) => {
-        // Check authorization:
-        // 1. If in the configured Admin Review Chat -> Authorized
-        // 2. If in private chat, check if user is an admin of the Admin Review Chat -> Authorized
+        // Check authorization (Admin Review Chat or private chat with an admin)
 
         if (!ctx.chat || !ctx.from) return;
 
@@ -30,14 +28,11 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
         }
 
         if (!isAuthorized) {
-            // Silent ignore for unauthorized users to avoid leaking bot existence/logic
             return;
         }
 
-        // Parse limit from arguments (default 10, max 20)
         const args = ctx.match;
         const parsedLimit = args ? parseInt(String(args), 10) : 10;
-        // Safety check
         const limit = (isNaN(parsedLimit) || parsedLimit < 1) ? 10 : Math.min(parsedLimit, 20);
 
         await ctx.reply(`Fetching last ${limit} requests...`);

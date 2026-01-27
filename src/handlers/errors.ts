@@ -18,7 +18,6 @@ export async function handleError(
         show_alert: true,
       });
     } catch (e) {
-      // Ignore errors in error handling
     }
   }
 }
@@ -30,7 +29,6 @@ export async function sendErrorToAdminGroup(
 ): Promise<void> {
   const errorMessage =
     error instanceof Error ? error.message : "Unknown error";
-  // Send as plain text - no formatting needed for error messages
   const adminMessage = `⚠️ Error in ${context}
 
 ${errorMessage}

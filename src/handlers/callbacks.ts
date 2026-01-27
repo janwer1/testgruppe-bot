@@ -22,7 +22,7 @@ export function registerCallbackHandlers(bot: any): void {
       return;
     }
 
-    // Parse callback data: approve_<requestId> or decline_<requestId>
+    // Parse callback data
     const [action, requestId] = data.split("_", 2);
 
     if (action !== "approve" && action !== "decline") {
@@ -33,7 +33,6 @@ export function registerCallbackHandlers(bot: any): void {
       return;
     }
 
-    // Validate requestId format: ULID (26 chars Base32)
     const isUlid = /^[0-9A-Z]{26}$/i.test(requestId);
 
     if (!requestId || !isUlid) {

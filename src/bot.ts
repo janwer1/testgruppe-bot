@@ -29,12 +29,10 @@ export function createBot(): Bot<BotContext> {
 
   // Message Router: Handles user input based on their current request state.
   bot.on("message:text", async (ctx: BotContext) => {
-    // GUARD: Ensure context has necessary data (TS narrowing)
     if (!ctx.chat || !ctx.from || !ctx.message || !ctx.message.text) {
       return;
     }
 
-    // GUARD: Only accept messages from private chats
     if (ctx.chat.type !== "private") {
       return;
     }
@@ -62,7 +60,6 @@ export function createBot(): Bot<BotContext> {
       return;
     }
 
-    // GUARD: Processed requests are final
     if (request.isProcessed()) {
       await ctx.reply("Request already processed");
       return;
@@ -71,7 +68,6 @@ export function createBot(): Bot<BotContext> {
     const text = ctx.message.text.trim();
     const currentState = request.getState();
 
-    // ROUTE: collectingReason
     if (currentState === "collectingReason") {
       const { validateReason } = await import("./utils/validation");
 
@@ -85,7 +81,7 @@ export function createBot(): Bot<BotContext> {
 
       // Update State
       request.submitReason(reason);
-      // PERSIST IMMEDIATELY: Ensure reason is saved even if posting to admin group fails
+      // Ensure reason is saved even if posting to admin group fails
       await joinRequestRepository.save(request);
 
       // Post Review Card
@@ -121,7 +117,6 @@ export function createBot(): Bot<BotContext> {
       return;
     }
 
-    // ROUTE: awaitingReview
     if (currentState === "awaitingReview") {
 
       const { validateAdditionalMessage } = await import("./utils/validation");

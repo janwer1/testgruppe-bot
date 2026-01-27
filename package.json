@@ -14,14 +14,13 @@
     "type-check": "tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "webhook:setup": "bun src/scripts/setup-webhook.ts",
-    "webhook:get": "bun src/scripts/get-webhook.ts",
-    "webhook:test": "bun src/scripts/test-webhook.ts",
+    "webhook:setup": "bun src/scripts/webhook.ts setup",
+    "webhook:get": "bun src/scripts/webhook.ts get",
+    "webhook:test": "bun src/scripts/webhook.ts test",
     "postinstall": "bun run webhook:setup",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@fluent/bundle": "^0.19.1",
     "@std/ulid": "npm:@jsr/std__ulid",
     "@t3-oss/env-core": "^0.13.10",
     "@upstash/redis": "^1.36.1",

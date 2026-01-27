@@ -5,34 +5,37 @@ import { env } from "../env";
 function countWords(str: string): number {
   return str.trim().split(/\s+/).length;
 }
+const baseTextSchema = z.string()
+  .trim()
+  .transform((val) => {
+    return val
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/\n{3,}/g, "\n\n");
+  });
 
 function getReasonSchema() {
-  return z.string()
-    .trim()
-    .min(1, getMessage("invalid-input"))
-    .max(env.MAX_REASON_CHARS || 500, getMessage("reason-too-long", { maxChars: env.MAX_REASON_CHARS || 500 }))
-    .transform((val) => {
-      return val
-        .replace(/\r\n/g, "\n")
-        .replace(/\r/g, "\n")
-        .replace(/\n{3,}/g, "\n\n");
-    })
-    .refine((val) => countWords(val) >= (env.MIN_REASON_WORDS || 15), {
-      message: getMessage("reason-too-short", { minWords: env.MIN_REASON_WORDS || 15 }),
-    });
+  const maxChars = env.MAX_REASON_CHARS;
+  const minWords = env.MIN_REASON_WORDS;
+
+  return baseTextSchema
+    .pipe(z.string()
+      .min(1, getMessage("invalid-input"))
+      .max(maxChars, getMessage("reason-too-long", { maxChars }))
+      .refine((val) => countWords(val) >= minWords, {
+        message: getMessage("reason-too-short", { minWords }),
+      })
+    );
 }
 
 function getAdditionalMessageSchema() {
-  return z.string()
-    .trim()
-    .min(1, getMessage("message-empty"))
-    .max(500, getMessage("message-too-long"))
-    .transform((val) => {
-      return val
-        .replace(/\r\n/g, "\n")
-        .replace(/\r/g, "\n")
-        .replace(/\n{3,}/g, "\n\n");
-    });
+  const maxChars = env.MAX_REASON_CHARS;
+
+  return baseTextSchema
+    .pipe(z.string()
+      .min(1, getMessage("message-empty"))
+      .max(maxChars, getMessage("message-too-long", { maxChars }))
+    );
 }
 
 export function validateReason(input: string): { success: boolean; data?: string; error?: string } {

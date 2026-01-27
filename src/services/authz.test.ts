@@ -39,6 +39,12 @@ test("isAdminInBothChats should return false if API call fails", async () => {
         }
     } as any;
 
+    const consoleSpy = mock(() => { });
+    const originalError = console.error;
+    console.error = consoleSpy;
+
     const result = await isAdminInBothChats(mockBot, 123);
     expect(result).toBe(false);
+
+    console.error = originalError;
 });
