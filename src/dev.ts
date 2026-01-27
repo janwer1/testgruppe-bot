@@ -36,8 +36,8 @@ async function main() {
     await bot.stop();
 
     // Always restore webhook on exit (using env vars)
-    if (config.webhookUrl && env.WEBHOOK_PATH) {
-      const webhookUrl = `${config.webhookUrl}${env.WEBHOOK_PATH}`;
+    if (config.webhookUrl) {
+      const webhookUrl = new URL(config.webhookPath, config.webhookUrl).toString();
       console.log(`🔄 Restoring webhook to: ${webhookUrl}`);
       try {
         await bot.api.setWebhook(webhookUrl, {
@@ -49,7 +49,7 @@ async function main() {
         console.error("❌ Failed to restore webhook:", error);
       }
     } else {
-      console.warn("⚠️  Cannot restore webhook: PUBLIC_BASE_URL or WEBHOOK_PATH not set");
+      console.warn("⚠️  Cannot restore webhook: PUBLIC_BASE_URL not set");
     }
     process.exit(0);
   };

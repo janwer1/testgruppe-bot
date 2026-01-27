@@ -31,10 +31,9 @@ const envSchema = {
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   PUBLIC_BASE_URL: z
     .string()
-    .optional()
+    .min(1, "PUBLIC_BASE_URL is required in production")
     .refine(
       (val) => {
-        if (!val) return true;
         try {
           new URL(val);
           return true;
@@ -44,7 +43,6 @@ const envSchema = {
       },
       { message: "PUBLIC_BASE_URL must be a valid URL" },
     ),
-  WEBHOOK_PATH: z.string().default("/api/bot"),
   WEBHOOK_SECRET_TOKEN: z.string().optional(),
   REASON_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
   MAX_REASON_CHARS: z.coerce.number().int().positive().default(500),

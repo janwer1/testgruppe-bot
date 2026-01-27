@@ -19,7 +19,7 @@ export default {
     const url = new URL(request.url);
 
     // Webhook endpoint
-    if (url.pathname === env.WEBHOOK_PATH) {
+    if (url.pathname === config.webhookPath) {
       if (request.method === "GET") {
         return createHealthCheckResponse();
       }

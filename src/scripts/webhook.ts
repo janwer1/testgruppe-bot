@@ -65,7 +65,7 @@ async function setupWebhook(force = false) {
     throw new Error("PUBLIC_BASE_URL (webhookUrl) is missing");
   }
 
-  const webhookUrl = new URL(env.WEBHOOK_PATH, config.webhookUrl).toString();
+  const webhookUrl = new URL(config.webhookPath, config.webhookUrl).toString();
 
   console.log(`🚀 Setting webhook to: ${webhookUrl}`);
 
@@ -92,7 +92,7 @@ async function testWebhook() {
   const env = parseEnv();
   const config = createConfigFromEnv(env);
   const baseUrl = config.webhookUrl || "http://localhost:8787";
-  const url = `${baseUrl}${env.WEBHOOK_PATH}`;
+  const url = new URL(config.webhookPath, baseUrl).toString();
 
   console.log(`🚀 Simulating Telegram webhook call to: ${url}`);
   if (!config.webhookSecret) {

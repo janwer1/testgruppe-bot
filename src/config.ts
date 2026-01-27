@@ -11,6 +11,7 @@ export function createConfigFromEnv(env: Env) {
     timezone: env.TIMEZONE,
     upstashRedisRestToken: env.UPSTASH_REDIS_REST_TOKEN,
     upstashRedisRestUrl: env.UPSTASH_REDIS_REST_URL,
+    webhookPath: "/api/bot" as const,
     webhookSecret: env.WEBHOOK_SECRET_TOKEN,
     webhookUrl: env.PUBLIC_BASE_URL,
   };
