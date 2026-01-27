@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createTestRequestInput } from "../test-fixtures";
+import { createTestRequestInput } from "../utils/test-fixtures";
 import { JoinRequest } from "./JoinRequest";
 
 test("JoinRequest should create a new request in pending state", () => {

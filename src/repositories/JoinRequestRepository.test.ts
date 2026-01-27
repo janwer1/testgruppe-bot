@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { JoinRequest } from "../domain/JoinRequest";
 import { MemoryStateStore } from "../services/state";
-import { createTestRequestInput, mockConfig } from "../test-fixtures";
+import { createTestRequestInput, mockConfig } from "../utils/test-fixtures";
 import { JoinRequestRepository } from "./JoinRequestRepository";
 
 test("should create a new join request", async () => {

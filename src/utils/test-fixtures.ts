@@ -1,5 +1,5 @@
-import type { BotConfig } from "./config";
-import type { JoinRequestInput } from "./domain/joinRequestMachine";
+import type { BotConfig } from "../config";
+import type { JoinRequestInput } from "../domain/joinRequestMachine";
 
 export const mockConfig: BotConfig = {
   botToken: "test-token",
@@ -8,6 +8,7 @@ export const mockConfig: BotConfig = {
   minReasonWords: 2,
   maxReasonChars: 100,
   timezone: "UTC",
+  webhookPath: "/api/bot" as const,
   webhookUrl: "https://test.com",
   webhookSecret: "secret",
   adminReviewChatId: -1002,

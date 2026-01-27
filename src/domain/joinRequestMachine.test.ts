@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { createActor } from "xstate";
-import { createTestRequestInput } from "../test-fixtures";
+import { createTestRequestInput } from "../utils/test-fixtures";
 import { joinRequestMachine } from "./joinRequestMachine";
 
 test("joinRequestMachine should start in pending state", () => {

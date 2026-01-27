@@ -1,5 +1,5 @@
 import { expect, mock, test } from "bun:test";
-import { mockConfig } from "../test-fixtures";
+import { mockConfig } from "../utils/test-fixtures";
 import { isAdminInBothChats } from "./authz";
 
 test("isAdminInBothChats should return true if user is admin in both chats", async () => {

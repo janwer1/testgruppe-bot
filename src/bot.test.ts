@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { JoinRequest } from "./domain/JoinRequest";
 import type { JoinRequestInput } from "./domain/joinRequestMachine";
-import { mockConfig } from "./test-fixtures";
+import { mockConfig } from "./utils/test-fixtures";
 
 // Test helper: Create a JoinRequest in a specific state
 function createRequestInState(state: string, requestId: string = "test-request-id"): JoinRequest {
