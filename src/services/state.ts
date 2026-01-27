@@ -153,7 +153,11 @@ export class MemoryStateStore implements StateStoreInterface {
     this.ttl = 604800 * 1000; // Default 1 week in ms
     // Clean up expired entries every 5 minutes
     if (typeof setInterval !== "undefined") {
-      setInterval(() => this.cleanup(), 5 * 60 * 1000);
+      const interval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
+      // Allows the process to exit if this is the only thing left in the event loop
+      if (typeof interval.unref === "function") {
+        interval.unref();
+      }
     }
   }
 

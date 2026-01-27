@@ -9,6 +9,11 @@ async function getWebhook() {
 
   const env = parseEnv();
   const config = createConfigFromEnv(env);
+
+  if (!config.botToken) {
+    console.log("ℹ️ Skipping webhook status fetch (BOT_TOKEN missing)");
+    return;
+  }
   const store = createStateStore(config);
   const repo = new JoinRequestRepository(store, config);
   const bot = createBot(config, repo);
@@ -44,20 +49,23 @@ async function setupWebhook(force = false) {
   const env = parseEnv();
   const config = createConfigFromEnv(env);
 
-  if (!config.botToken) {
-    throw new Error("BOT_TOKEN is missing from environment");
-  }
-
-  if (!config.webhookUrl) {
-    throw new Error(
-      "PUBLIC_BASE_URL (mapped to webhookUrl) is missing. Cannot set webhook. Example: https://bot.example.com",
-    );
+  if (!config.botToken || !config.webhookUrl) {
+    if (isCI) {
+      throw new Error("❌ CI Environment: BOT_TOKEN or PUBLIC_BASE_URL is missing. Webhook setup failed.");
+    }
+    console.log("ℹ️ Skipping webhook setup (Missing BOT_TOKEN or PUBLIC_BASE_URL)");
+    return;
   }
 
   const store = createStateStore(config);
   const repo = new JoinRequestRepository(store, config);
   const bot = createBot(config, repo);
-  const webhookUrl = `${config.webhookUrl}${env.WEBHOOK_PATH}`;
+
+  if (!config.webhookUrl) {
+    throw new Error("PUBLIC_BASE_URL (webhookUrl) is missing");
+  }
+
+  const webhookUrl = new URL(env.WEBHOOK_PATH, config.webhookUrl).toString();
 
   console.log(`🚀 Setting webhook to: ${webhookUrl}`);
 

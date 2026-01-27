@@ -84,10 +84,12 @@ const envSchemaObj = z.object(envSchema);
 export type Env = z.infer<typeof envSchemaObj>;
 
 export function parseEnv(runtimeEnv: Record<string, string | undefined> = process.env): Env {
+  const skipValidation = process.env.SKIP_ENV_VALIDATION === "true";
+
   return createEnv({
     server: envSchema,
     runtimeEnv,
-    skipValidation: false,
+    skipValidation,
     emptyStringAsUndefined: true,
-  });
+  }) as Env;
 }
