@@ -1,5 +1,5 @@
-import { env } from "../env";
 import { Redis } from "@upstash/redis";
+import type { BotConfig } from "../config";
 
 export interface RequestState {
   targetChatId: number;
@@ -17,7 +17,7 @@ export interface RequestState {
   decisionAt?: number;
 }
 
-interface StateStoreInterface {
+export interface StateStoreInterface {
   set(requestId: string, state: RequestState): Promise<void>;
   get(requestId: string): Promise<RequestState | undefined>;
   setUserActiveRequest(userId: number, requestId: string): Promise<void>;
@@ -27,20 +27,20 @@ interface StateStoreInterface {
   getRecentRequests(limit: number): Promise<string[]>;
 }
 
-class RedisStateStore implements StateStoreInterface {
+export class RedisStateStore implements StateStoreInterface {
   private redis: Redis;
   private ttl: number;
 
-  constructor() {
-    if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
-      throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required for Redis state store");
+  constructor(config: BotConfig) {
+    if (!config.upstashRedisRestUrl || !config.upstashRedisRestToken) {
+      throw new Error("upstashRedisRestUrl and upstashRedisRestToken are required for Redis state store");
     }
 
     this.redis = new Redis({
-      url: env.UPSTASH_REDIS_REST_URL,
-      token: env.UPSTASH_REDIS_REST_TOKEN,
+      url: config.upstashRedisRestUrl,
+      token: config.upstashRedisRestToken,
     });
-    this.ttl = env.REASON_TTL_SECONDS;
+    this.ttl = 604800; // Default 1 week, could be configurable
   }
 
   private requestKey(requestId: string): string {
@@ -106,11 +106,14 @@ class RedisStateStore implements StateStoreInterface {
     }
   }
 
-  async addToTimeline(requestId: string, timestamp: number): Promise<void> {
+  async addToTimeline(requestId: string, _timestamp: number): Promise<void> {
     try {
       // Use score 0 to rely on lexicographical sorting of members.
       // Since members are ULIDs (time-ordered strings), this sorts by time.
-      await this.redis.zadd(this.timelineKey(), { score: 0, member: requestId });
+      await this.redis.zadd(this.timelineKey(), {
+        score: 0,
+        member: requestId,
+      });
       // Trim timeline to keep only recent 1000 requests.
       // For lexicographical sorting (all scores 0), Redis sorts A-Z.
       // zrange 0 -1 returns oldest first.
@@ -128,7 +131,9 @@ class RedisStateStore implements StateStoreInterface {
       // With score 0, ZRANGE ... REV gives us Reverse Lexicographical order (Z-A).
       // Since ULIDs grow alphabetically over time, Z is newest.
       // So this returns newest requests first.
-      const result = await this.redis.zrange(this.timelineKey(), 0, limit - 1, { rev: true });
+      const result = await this.redis.zrange(this.timelineKey(), 0, limit - 1, {
+        rev: true,
+      });
       return result as string[];
     } catch (error) {
       console.error("[RedisStateStore] Error getting recent requests:", error);
@@ -137,16 +142,17 @@ class RedisStateStore implements StateStoreInterface {
   }
 }
 
-class MemoryStateStore implements StateStoreInterface {
+export class MemoryStateStore implements StateStoreInterface {
   private store: Map<string, RequestState> = new Map();
   private userActiveRequests: Map<number, string> = new Map(); // userId -> requestId
   private timeline: Array<{ requestId: string; timestamp: number }> = [];
   private ttl: number;
 
-  constructor() {
-    this.ttl = (env.REASON_TTL_SECONDS || 604800) * 1000; // Convert to milliseconds
+  constructor(_config?: BotConfig) {
+    // Config optional for tests
+    this.ttl = 604800 * 1000; // Default 1 week in ms
     // Clean up expired entries every 5 minutes
-    if (typeof setInterval !== 'undefined') {
+    if (typeof setInterval !== "undefined") {
       setInterval(() => this.cleanup(), 5 * 60 * 1000);
     }
   }
@@ -232,16 +238,19 @@ class MemoryStateStore implements StateStoreInterface {
   }
 }
 
-let stateStore: StateStoreInterface;
-const isTest = process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test";
-const hasRedisConfig = !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN && !env.UPSTASH_REDIS_REST_URL.includes("example.com"));
+export function createStateStore(config: BotConfig): StateStoreInterface {
+  const isTest = process.env.NODE_ENV === "test" || process.env.BUN_ENV === "test";
+  const hasRedisConfig = !!(
+    config.upstashRedisRestUrl &&
+    config.upstashRedisRestToken &&
+    !config.upstashRedisRestUrl.includes("example.com")
+  );
 
-if (!isTest && hasRedisConfig) {
-  console.log("[StateStore] Using Redis for persistent storage");
-  stateStore = new RedisStateStore();
-} else {
-  console.log(`[StateStore] Using in-memory storage (${isTest ? "Test Mode" : "Redis not configured"})`);
-  stateStore = new MemoryStateStore();
+  if (!isTest && hasRedisConfig) {
+    console.log("[StateStore] Using Redis for persistent storage");
+    return new RedisStateStore(config);
+  } else {
+    console.log(`[StateStore] Using in-memory storage (${isTest ? "Test Mode" : "Redis not configured"})`);
+    return new MemoryStateStore(config);
+  }
 }
-
-export { stateStore };

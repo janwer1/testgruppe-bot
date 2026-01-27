@@ -1,34 +1,23 @@
-import { test, expect } from "bun:test";
+import { expect, test } from "bun:test";
+import { createTestRequestInput } from "../test-fixtures";
 import { JoinRequest } from "./JoinRequest";
-import type { JoinRequestInput } from "./joinRequestMachine";
-
-function createTestInput(): JoinRequestInput {
-  return {
-    requestId: "test-request-123",
-    userId: 12345,
-    targetChatId: -1001234567890,
-    userName: "Test User",
-    username: "testuser",
-    timestamp: Date.now(),
-  };
-}
 
 test("JoinRequest should create a new request in pending state", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   expect(request.getState()).toBe("pending");
   expect(request.isProcessed()).toBe(false);
 });
 
 test("JoinRequest should transition to collectingReason when startCollection is called", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   expect(request.getState()).toBe("collectingReason");
 });
 
 test("JoinRequest should submit reason and transition to awaitingReview", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
 
@@ -41,7 +30,7 @@ test("JoinRequest should submit reason and transition to awaitingReview", () => 
 });
 
 test("JoinRequest should reject invalid reason (too long)", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
 
@@ -52,7 +41,7 @@ test("JoinRequest should reject invalid reason (too long)", () => {
 });
 
 test("JoinRequest should reject invalid reason (empty)", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
 
@@ -62,7 +51,7 @@ test("JoinRequest should reject invalid reason (empty)", () => {
 });
 
 test("JoinRequest should add additional messages", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   request.submitReason("Initial reason for test");
@@ -75,7 +64,7 @@ test("JoinRequest should add additional messages", () => {
 });
 
 test("JoinRequest should set admin message ID", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   request.submitReason("Test reason for request");
@@ -88,7 +77,7 @@ test("JoinRequest should set admin message ID", () => {
 });
 
 test("JoinRequest should approve request", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   request.submitReason("Test reason for approval");
@@ -105,7 +94,7 @@ test("JoinRequest should approve request", () => {
 });
 
 test("JoinRequest should decline request", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   request.submitReason("Test reason for decline");
@@ -122,7 +111,7 @@ test("JoinRequest should decline request", () => {
 });
 
 test("JoinRequest should not allow approving without reason", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
 
@@ -132,7 +121,7 @@ test("JoinRequest should not allow approving without reason", () => {
 });
 
 test("JoinRequest should not allow approving twice", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   request.submitReason("Test reason double approve");
@@ -147,7 +136,7 @@ test("JoinRequest should not allow approving twice", () => {
 });
 
 test("JoinRequest should restore from context correctly", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   request.submitReason("Test reason for restore");
@@ -165,7 +154,7 @@ test("JoinRequest should restore from context correctly", () => {
 });
 
 test("JoinRequest should restore approved request from context", () => {
-  const input = createTestInput();
+  const input = createTestRequestInput();
   const request = new JoinRequest(input);
   request.startCollection();
   request.submitReason("Test reason restore approved");

@@ -11,7 +11,7 @@ const envSchema = {
     })
     .transform((val: string) => {
       const num = parseInt(val, 10);
-      if (isNaN(num)) {
+      if (Number.isNaN(num)) {
         throw new Error("TARGET_CHAT_ID must be a valid number");
       }
       return num;
@@ -23,7 +23,7 @@ const envSchema = {
     })
     .transform((val: string) => {
       const num = parseInt(val, 10);
-      if (isNaN(num)) {
+      if (Number.isNaN(num)) {
         throw new Error("ADMIN_REVIEW_CHAT_ID must be a valid number");
       }
       return num;
@@ -42,7 +42,7 @@ const envSchema = {
           return false;
         }
       },
-      { message: "PUBLIC_BASE_URL must be a valid URL" }
+      { message: "PUBLIC_BASE_URL must be a valid URL" },
     ),
   WEBHOOK_PATH: z.string().default("/api/bot"),
   WEBHOOK_SECRET_TOKEN: z.string().optional(),
@@ -55,53 +55,39 @@ const envSchema = {
     .transform((val: string) => val === "true")
     .pipe(z.boolean())
     .default(false),
-  UPSTASH_REDIS_REST_URL: z
-    .string()
-    .refine(
-      (val: string) => {
-        try {
-          new URL(val);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { message: "UPSTASH_REDIS_REST_URL must be a valid URL" }
-    ),
+  UPSTASH_REDIS_REST_URL: z.string().refine(
+    (val: string) => {
+      try {
+        new URL(val);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: "UPSTASH_REDIS_REST_URL must be a valid URL" },
+  ),
   UPSTASH_REDIS_REST_TOKEN: z.string(),
-  JOIN_LINK: z
-    .string()
-    .refine(
-      (val: string) => {
-        try {
-          new URL(val);
-          return true;
-        } catch {
-          return false;
-        }
-      },
-      { message: "JOIN_LINK must be a valid URL" }
-    ),
+  JOIN_LINK: z.string().refine(
+    (val: string) => {
+      try {
+        new URL(val);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: "JOIN_LINK must be a valid URL" },
+  ),
 };
 
-type Env = z.infer<z.ZodObject<typeof envSchema>>;
+const envSchemaObj = z.object(envSchema);
+export type Env = z.infer<typeof envSchemaObj>;
 
-let _env: Env | undefined;
-
-export function initEnv(runtimeEnv: Record<string, string | undefined> = process.env) {
-  _env = createEnv({
+export function parseEnv(runtimeEnv: Record<string, string | undefined> = process.env): Env {
+  return createEnv({
     server: envSchema,
     runtimeEnv,
     skipValidation: false,
     emptyStringAsUndefined: true,
   });
 }
-
-export const env = new Proxy({} as Env, {
-  get(_, prop: string | symbol) {
-    if (!_env) {
-      initEnv();
-    }
-    return _env![prop as keyof Env];
-  },
-});

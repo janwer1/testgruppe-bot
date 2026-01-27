@@ -1,7 +1,9 @@
-import { setup, assign } from "xstate";
-import { validateReason, validateAdditionalMessage } from "../utils/validation";
+import { assign, setup } from "xstate";
+import type { BotConfig } from "../config";
+import { validateAdditionalMessage, validateReason } from "../utils/validation";
 
 export interface JoinRequestContext {
+  config: BotConfig;
   requestId: string;
   userId: number;
   targetChatId: number;
@@ -20,10 +22,7 @@ export interface JoinRequestContext {
 }
 
 // Machine input type (what's required to create a machine instance)
-export type JoinRequestInput = Omit<
-  JoinRequestContext,
-  "reason" | "additionalMessages" | "adminMsgId" | "decision"
->;
+export type JoinRequestInput = Omit<JoinRequestContext, "reason" | "additionalMessages" | "adminMsgId" | "decision">;
 
 // Machine events
 export type JoinRequestEvent =
@@ -42,13 +41,13 @@ export const joinRequestMachine = setup({
     events: {} as JoinRequestEvent,
   },
   guards: {
-    isValidReason: ({ event }) => {
+    isValidReason: ({ context, event }) => {
       if (event.type !== "SUBMIT_REASON") return false;
-      return validateReason(event.reason).success;
+      return validateReason(event.reason, context.config).success;
     },
-    isValidMessage: ({ event }) => {
+    isValidMessage: ({ context, event }) => {
       if (event.type !== "ADD_MESSAGE") return false;
-      return validateAdditionalMessage(event.message).success;
+      return validateAdditionalMessage(event.message, context.config).success;
     },
     isReadyForDecision: ({ context }) => {
       return context.reason !== undefined;
@@ -73,10 +72,7 @@ export const joinRequestMachine = setup({
     addMessage: assign(({ context, event }: { context: JoinRequestContext; event: JoinRequestEvent }) => {
       if (event.type !== "ADD_MESSAGE") return {};
       return {
-        additionalMessages: [
-          ...context.additionalMessages,
-          event.message.trim(),
-        ],
+        additionalMessages: [...context.additionalMessages, event.message.trim()],
       };
     }),
     markApproved: assign(({ event }: { event: JoinRequestEvent }) => {

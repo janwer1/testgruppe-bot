@@ -1,6 +1,7 @@
+import type { BotConfig } from "../config";
 import { JoinRequest } from "../domain/JoinRequest";
 import type { JoinRequestContext, JoinRequestInput } from "../domain/joinRequestMachine";
-import { stateStore, RequestState } from "../services/state";
+import type { RequestState, StateStoreInterface } from "../services/state";
 
 /**
  * Repository interface for join request persistence
@@ -18,6 +19,14 @@ export interface IJoinRequestRepository {
  * Handles long-term storage of JoinRequest entities in Redis
  */
 export class JoinRequestRepository implements IJoinRequestRepository {
+  private store: StateStoreInterface;
+  private config: BotConfig;
+
+  constructor(store: StateStoreInterface, config: BotConfig) {
+    this.store = store;
+    this.config = config;
+  }
+
   /**
    * Create a new join request
    */
@@ -25,10 +34,10 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     const request = new JoinRequest(input);
 
     // Link user to this request ID
-    await stateStore.setUserActiveRequest(input.userId, input.requestId);
+    await this.store.setUserActiveRequest(input.userId, input.requestId);
 
     // Add to timeline for admin listing
-    await stateStore.addToTimeline(input.requestId, input.timestamp);
+    await this.store.addToTimeline(input.requestId, input.timestamp);
 
     // Persist initial state
     await this.save(request);
@@ -40,12 +49,13 @@ export class JoinRequestRepository implements IJoinRequestRepository {
    * Find request by ID
    */
   async findById(requestId: string): Promise<JoinRequest | undefined> {
-    const state = await stateStore.get(requestId);
+    const state = await this.store.get(requestId);
     if (!state) {
       return undefined;
     }
 
     const context: JoinRequestContext = {
+      config: this.config,
       requestId,
       userId: state.userId,
       targetChatId: state.targetChatId,
@@ -57,11 +67,11 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       timestamp: state.timestamp,
       decision: state.decisionStatus
         ? {
-          status: state.decisionStatus,
-          adminId: state.decisionAdminId || 0,
-          adminName: state.decisionAdminName || "Unknown",
-          at: state.decisionAt || state.timestamp,
-        }
+            status: state.decisionStatus,
+            adminId: state.decisionAdminId || 0,
+            adminName: state.decisionAdminName || "Unknown",
+            at: state.decisionAt || state.timestamp,
+          }
         : undefined,
     };
 
@@ -72,7 +82,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
    * Find request by user ID
    */
   async findByUserId(userId: number): Promise<JoinRequest | undefined> {
-    const requestId = await stateStore.getActiveRequestIdByUserId(userId);
+    const requestId = await this.store.getActiveRequestIdByUserId(userId);
     if (!requestId) {
       return undefined;
     }
@@ -84,7 +94,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
    * Find recent requests
    */
   async findRecent(limit: number = 10): Promise<JoinRequest[]> {
-    const requestIds = await stateStore.getRecentRequests(limit);
+    const requestIds = await this.store.getRecentRequests(limit);
     const requests = await Promise.all(requestIds.map((id) => this.findById(id)));
     // Filter out undefined results (in case of expired/missing data)
     return requests.filter((r): r is JoinRequest => r !== undefined);
@@ -115,17 +125,14 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     };
 
     // Save the request entity
-    await stateStore.set(context.requestId, requestState);
+    await this.store.set(context.requestId, requestState);
 
     // Update active request pointer based on state
     if (state === "collectingReason" || state === "awaitingReview") {
-      await stateStore.setUserActiveRequest(context.userId, context.requestId);
+      await this.store.setUserActiveRequest(context.userId, context.requestId);
     } else if (state === "approved" || state === "declined") {
       // Clear pointer for finalized requests
-      await stateStore.clearUserActiveRequest(context.userId);
+      await this.store.clearUserActiveRequest(context.userId);
     }
   }
 }
-
-// Export singleton instance
-export const joinRequestRepository = new JoinRequestRepository();

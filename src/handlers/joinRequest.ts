@@ -1,13 +1,12 @@
-import { BotContext } from "../types";
-import { postReviewCard } from "../services/reviewCard";
-import { joinRequestRepository } from "../repositories/JoinRequestRepository";
-import { handleError } from "./errors";
-import type { JoinRequestInput } from "../domain/joinRequestMachine";
-import { getMessage } from "../templates/messages";
-import { env } from "../env";
 import { ulid } from "@std/ulid";
+import type { Bot } from "grammy";
+import type { JoinRequestInput } from "../domain/joinRequestMachine";
+import { postReviewCard } from "../services/reviewCard";
+import { getMessage } from "../templates/messages";
+import type { BotContext } from "../types";
+import { handleError } from "./errors";
 
-export function registerJoinRequestHandler(bot: any): void {
+export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
   bot.on("chat_join_request", async (ctx: BotContext) => {
     try {
       const joinRequest = ctx.chatJoinRequest;
@@ -29,6 +28,7 @@ export function registerJoinRequestHandler(bot: any): void {
 
       // Create join request using repository
       const input: JoinRequestInput = {
+        config: ctx.config,
         requestId,
         userId,
         targetChatId,
@@ -37,12 +37,12 @@ export function registerJoinRequestHandler(bot: any): void {
         timestamp: Date.now(),
       };
 
-      const request = await joinRequestRepository.create(input);
+      const request = await ctx.repo.create(input);
 
       // Manually start collection state (skipping machine validation since it's fresh)
       // This ensures state is "collectingReason" before we even send the DM
       request.startCollection();
-      await joinRequestRepository.save(request);
+      await ctx.repo.save(request);
 
       // Try to send DM with the welcome message
       try {
@@ -50,10 +50,7 @@ export function registerJoinRequestHandler(bot: any): void {
 
         const recipientId = joinRequest.user_chat_id || userId;
 
-        await ctx.api.sendMessage(
-          recipientId,
-          getMessage("welcome", { minWords: env.MIN_REASON_WORDS })
-        );
+        await ctx.api.sendMessage(recipientId, getMessage("welcome", { minWords: ctx.config.minReasonWords }));
       } catch (dmError) {
         console.error("Failed to send DM to user:", dmError);
 
@@ -70,14 +67,14 @@ export function registerJoinRequestHandler(bot: any): void {
           additionalMessages: [],
         };
 
-        const adminMsgId = await postReviewCard(ctx.api, reviewCardData);
+        const adminMsgId = await postReviewCard(ctx.api, reviewCardData, ctx.config);
         if (adminMsgId) {
           // Domain model requires "collectingReason" state for submitReason.
           // Since we called startCollection() above, we are good.
           request.submitReason(failureReason);
           request.setAdminMsgId(adminMsgId);
           // Save the request
-          await joinRequestRepository.save(request);
+          await ctx.repo.save(request);
         }
 
         return;

@@ -1,7 +1,7 @@
-import { createActor, Actor } from "xstate";
-import { joinRequestMachine } from "./joinRequestMachine";
+import { type Actor, createActor } from "xstate";
+import { validateAdditionalMessage, validateReason } from "../utils/validation";
 import type { JoinRequestContext, JoinRequestInput } from "./joinRequestMachine";
-import { validateReason, validateAdditionalMessage } from "../utils/validation";
+import { joinRequestMachine } from "./joinRequestMachine";
 
 /**
  * Domain model for a join request with XState state machine
@@ -61,21 +61,19 @@ export class JoinRequest {
    */
   submitReason(reason: string): { success: boolean; error?: string } {
     if (!this.isInState("collectingReason")) {
-      return { success: false, error: "Request is not in collecting reason state" };
+      return {
+        success: false,
+        error: "Request is not in collecting reason state",
+      };
     }
 
-    const validation = validateReason(reason);
-    if (!validation.success) {
-      return { success: false, error: validation.error };
-    }
-
-    try {
-      this.actor.send({ type: "SUBMIT_REASON", reason: validation.data! });
+    const validation = validateReason(reason, this.context.config);
+    if (validation.success) {
+      this.actor.send({ type: "SUBMIT_REASON", reason: validation.data });
       this.syncContext();
       return { success: true };
-    } catch (error) {
-      return { success: false, error: String(error) };
     }
+    return { success: false, error: validation.error };
   }
 
   /**
@@ -103,18 +101,13 @@ export class JoinRequest {
       return { success: false, error: "Request is not awaiting review" };
     }
 
-    const validation = validateAdditionalMessage(message);
-    if (!validation.success) {
-      return { success: false, error: validation.error };
-    }
-
-    try {
-      this.actor.send({ type: "ADD_MESSAGE", message: validation.data! });
+    const validation = validateAdditionalMessage(message, this.context.config);
+    if (validation.success) {
+      this.actor.send({ type: "ADD_MESSAGE", message: validation.data });
       this.syncContext();
       return { success: true };
-    } catch (error) {
-      return { success: false, error: String(error) };
     }
+    return { success: false, error: validation.error };
   }
 
   /**
@@ -174,6 +167,7 @@ export class JoinRequest {
   static fromContext(context: JoinRequestContext): JoinRequest {
     // Extract input fields (required for machine creation)
     const input: JoinRequestInput = {
+      config: context.config,
       requestId: context.requestId,
       userId: context.userId,
       targetChatId: context.targetChatId,
@@ -199,7 +193,10 @@ export class JoinRequest {
 
     // 3. Set admin message ID if exists
     if (context.adminMsgId !== undefined) {
-      request.actor.send({ type: "SET_ADMIN_MSG_ID", adminMsgId: context.adminMsgId });
+      request.actor.send({
+        type: "SET_ADMIN_MSG_ID",
+        adminMsgId: context.adminMsgId,
+      });
       request.syncContext();
     }
 

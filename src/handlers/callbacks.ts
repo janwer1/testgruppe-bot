@@ -1,11 +1,11 @@
-import { BotContext } from "../types";
+import type { Bot } from "grammy";
 import { isAdminInBothChats } from "../services/authz";
-import { joinRequestRepository } from "../repositories/JoinRequestRepository";
 import { updateReviewCard } from "../services/reviewCard";
-import { handleError, sendErrorToAdminGroup } from "./errors";
 import { getMessage } from "../templates/messages";
+import type { BotContext } from "../types";
+import { handleError, sendErrorToAdminGroup } from "./errors";
 
-export function registerCallbackHandlers(bot: any): void {
+export function registerCallbackHandlers(bot: Bot<BotContext>): void {
   bot.on("callback_query:data", async (ctx: BotContext) => {
     if (!ctx.callbackQuery || !ctx.from) {
       return;
@@ -45,7 +45,7 @@ export function registerCallbackHandlers(bot: any): void {
 
     try {
       // Get request using repository
-      const request = await joinRequestRepository.findById(requestId);
+      const request = await ctx.repo.findById(requestId);
       if (!request) {
         await ctx.answerCallbackQuery({
           text: getMessage("request-not-found"),
@@ -66,7 +66,8 @@ export function registerCallbackHandlers(bot: any): void {
       }
 
       // Verify admin authorization
-      const isAuthorized = await isAdminInBothChats(bot, adminId);
+      // TODO: Refactor authz to use context/config
+      const isAuthorized = await isAdminInBothChats(bot, adminId, ctx.config);
       if (!isAuthorized) {
         await ctx.answerCallbackQuery({
           text: getMessage("not-authorized"),
@@ -78,10 +79,7 @@ export function registerCallbackHandlers(bot: any): void {
       // Perform the action using domain model
       if (action === "approve") {
         try {
-          await bot.api.approveChatJoinRequest(
-            context.targetChatId,
-            context.userId
-          );
+          await bot.api.approveChatJoinRequest(context.targetChatId, context.userId);
 
           // Use domain model to approve
           const approveResult = request.approve(adminId, adminName);
@@ -90,7 +88,7 @@ export function registerCallbackHandlers(bot: any): void {
           }
 
           // Save updated request
-          await joinRequestRepository.save(request);
+          await ctx.repo.save(request);
 
           // Notify user
           try {
@@ -113,7 +111,8 @@ export function registerCallbackHandlers(bot: any): void {
               timestamp: new Date(context.timestamp),
               requestId,
               additionalMessages: context.additionalMessages,
-            }
+            },
+            ctx.config,
           );
 
           await ctx.answerCallbackQuery({
@@ -121,7 +120,7 @@ export function registerCallbackHandlers(bot: any): void {
             show_alert: false,
           });
         } catch (apiError) {
-          await sendErrorToAdminGroup(bot, apiError, "approveChatJoinRequest");
+          await sendErrorToAdminGroup(bot, apiError, "approveChatJoinRequest", ctx.config);
           await ctx.answerCallbackQuery({
             text: getMessage("error-approving"),
             show_alert: true,
@@ -129,10 +128,7 @@ export function registerCallbackHandlers(bot: any): void {
         }
       } else if (action === "decline") {
         try {
-          await bot.api.declineChatJoinRequest(
-            context.targetChatId,
-            context.userId
-          );
+          await bot.api.declineChatJoinRequest(context.targetChatId, context.userId);
 
           // Use domain model to decline
           const declineResult = request.decline(adminId, adminName);
@@ -141,7 +137,7 @@ export function registerCallbackHandlers(bot: any): void {
           }
 
           // Save updated request
-          await joinRequestRepository.save(request);
+          await ctx.repo.save(request);
 
           // Notify user
           try {
@@ -164,7 +160,8 @@ export function registerCallbackHandlers(bot: any): void {
               timestamp: new Date(context.timestamp),
               requestId,
               additionalMessages: context.additionalMessages,
-            }
+            },
+            ctx.config,
           );
 
           await ctx.answerCallbackQuery({
@@ -172,7 +169,7 @@ export function registerCallbackHandlers(bot: any): void {
             show_alert: false,
           });
         } catch (apiError) {
-          await sendErrorToAdminGroup(bot, apiError, "declineChatJoinRequest");
+          await sendErrorToAdminGroup(bot, apiError, "declineChatJoinRequest", ctx.config);
           await ctx.answerCallbackQuery({
             text: getMessage("error-declining"),
             show_alert: true,

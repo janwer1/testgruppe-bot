@@ -1,11 +1,14 @@
 import { z } from "zod";
+import type { BotConfig } from "../config";
 import { getMessage } from "../templates/messages";
-import { env } from "../env";
 
 function countWords(str: string): number {
   return str.trim().split(/\s+/).length;
 }
-const baseTextSchema = z.string()
+
+// Base schema for any text message input - handles trimming and normalization
+const baseTextSchema = z
+  .string()
   .trim()
   .transform((val) => {
     return val
@@ -14,46 +17,53 @@ const baseTextSchema = z.string()
       .replace(/\n{3,}/g, "\n\n");
   });
 
-function getReasonSchema() {
-  const maxChars = env.MAX_REASON_CHARS;
-  const minWords = env.MIN_REASON_WORDS;
+function getReasonSchema(config: BotConfig) {
+  const maxChars = config.maxReasonChars;
+  const minWords = config.minReasonWords;
 
-  return baseTextSchema
-    .pipe(z.string()
+  return baseTextSchema.pipe(
+    z
+      .string()
       .min(1, getMessage("invalid-input"))
       .max(maxChars, getMessage("reason-too-long", { maxChars }))
       .refine((val) => countWords(val) >= minWords, {
         message: getMessage("reason-too-short", { minWords }),
-      })
-    );
+      }),
+  );
 }
 
-function getAdditionalMessageSchema() {
-  const maxChars = env.MAX_REASON_CHARS;
+function getAdditionalMessageSchema(config: BotConfig) {
+  const maxChars = config.maxReasonChars;
 
-  return baseTextSchema
-    .pipe(z.string()
-      .min(1, getMessage("message-empty"))
-      .max(maxChars, getMessage("message-too-long", { maxChars }))
-    );
+  return baseTextSchema.pipe(
+    z.string().min(1, getMessage("message-empty")).max(maxChars, getMessage("message-too-long", { maxChars })),
+  );
 }
 
-export function validateReason(input: string): { success: boolean; data?: string; error?: string } {
-  const result = getReasonSchema().safeParse(input);
+export type ValidationResult = { success: true; data: string } | { success: false; error: string };
+
+export function validateReason(input: string, config: BotConfig): ValidationResult {
+  const result = getReasonSchema(config).safeParse(input);
   if (result.success) {
     return { success: true, data: result.data };
   } else {
     const firstError = result.error.issues[0];
-    return { success: false, error: firstError?.message || getMessage("invalid-input") };
+    return {
+      success: false,
+      error: firstError?.message || getMessage("invalid-input"),
+    };
   }
 }
 
-export function validateAdditionalMessage(input: string): { success: boolean; data?: string; error?: string } {
-  const result = getAdditionalMessageSchema().safeParse(input);
+export function validateAdditionalMessage(input: string, config: BotConfig): ValidationResult {
+  const result = getAdditionalMessageSchema(config).safeParse(input);
   if (result.success) {
     return { success: true, data: result.data };
   } else {
     const firstError = result.error.issues[0];
-    return { success: false, error: firstError?.message || getMessage("invalid-input") };
+    return {
+      success: false,
+      error: firstError?.message || getMessage("invalid-input"),
+    };
   }
 }

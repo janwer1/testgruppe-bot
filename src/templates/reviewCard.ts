@@ -1,20 +1,16 @@
-import { ReviewCardData } from "../services/reviewCard";
+import type { ReviewCardData } from "../services/reviewCard";
 import { formatDateWithTimezone } from "../utils/date";
-import { env } from "../env";
 
-export function formatReviewCardMessage(
-    data: ReviewCardData,
-    timezone: string = env.TIMEZONE
-): string {
-    const dateStr = formatDateWithTimezone(new Date(data.timestamp), timezone);
-    const userHandle = data.username ? ` (@${data.username})` : "";
+export function formatReviewCardMessage(data: ReviewCardData, timezone: string): string {
+  const dateStr = formatDateWithTimezone(new Date(data.timestamp), timezone);
+  const userHandle = data.username ? ` (@${data.username})` : "";
 
-    let additionalStr = "";
-    if (data.additionalMessages && data.additionalMessages.length > 0) {
-        additionalStr = "\n\n" + data.additionalMessages.join("\n\n");
-    }
+  let additionalStr = "";
+  if (data.additionalMessages && data.additionalMessages.length > 0) {
+    additionalStr = `\n\n${data.additionalMessages.join("\n\n")}`;
+  }
 
-    return `
+  return `
 📋 Neue Beitrittsanfrage - Bitte prüfen
 
 👤 Nutzer: ${data.userName}${userHandle}
@@ -27,16 +23,16 @@ ${data.reason}${additionalStr}
 }
 
 export function formatUpdatedReviewCardMessage(
-    data: ReviewCardData,
-    status: "approved" | "declined",
-    adminName: string,
-    timezone: string = env.TIMEZONE
+  data: ReviewCardData,
+  status: "approved" | "declined",
+  adminName: string,
+  _timezone: string,
 ): string {
-    const statusHeader = status === "approved" ? "✅ GENEHMIGT" : "❌ ABGELEHNT";
-    const userHandle = data.username ? ` (@${data.username})` : "";
-    const statusFooter = status === "approved" ? "GENEHMIGT" : "ABGELEHNT";
+  const statusHeader = status === "approved" ? "✅ GENEHMIGT" : "❌ ABGELEHNT";
+  const userHandle = data.username ? ` (@${data.username})` : "";
+  const statusFooter = status === "approved" ? "GENEHMIGT" : "ABGELEHNT";
 
-    return `
+  return `
 ${statusHeader}
 
 👤 Nutzer: ${data.userName}${userHandle}

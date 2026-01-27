@@ -1,6 +1,6 @@
 # Telegram Join Request Bot
 
-Production-ready Telegram bot that automates the join request review process for private channels using grammY, Bun, and TypeScript. 
+Production-ready Telegram bot that automates the join request review process for private channels using grammY, Bun, and TypeScript.
 
 See [AGENTS.md](./AGENTS.md) for architectural details and implementation patterns.
 
@@ -40,7 +40,7 @@ See [AGENTS.md](./AGENTS.md) for architectural details and implementation patter
    cp .env.example .env
    ```
    Fill in the required variables (Bot Token, Chat IDs) in `.env`.
-   
+
    **Persistence:** Use Upstash Redis (`UPSTASH_*` variables) for production state persistence. Without it, the bot uses in-memory storage which resets on restart.
 
 ## Development Mode

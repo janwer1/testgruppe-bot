@@ -1,6 +1,7 @@
-import { test, expect } from "bun:test";
+import { expect, test } from "bun:test";
 import { JoinRequest } from "./domain/JoinRequest";
 import type { JoinRequestInput } from "./domain/joinRequestMachine";
+import { mockConfig } from "./test-fixtures";
 
 // Test helper: Create a JoinRequest in a specific state
 function createRequestInState(state: string, requestId: string = "test-request-id"): JoinRequest {
@@ -11,6 +12,7 @@ function createRequestInState(state: string, requestId: string = "test-request-i
     userName: "Test User",
     username: "testuser",
     timestamp: Date.now(),
+    config: mockConfig,
   };
 
   const request = new JoinRequest(input);
@@ -79,12 +81,9 @@ test("should handle final states (approved/declined) correctly", () => {
 
   expect(approvedState).toBe("approved");
   expect(declinedState).toBe("declined");
-  // Final states are not in collectingReason or awaitingReview, so shouldSkip is false
-  // This is fine - the middleware would try to enter, but the request is already processed
   expect(shouldSkipApproved).toBe(false);
   expect(shouldSkipDeclined).toBe(false);
 });
-
 
 test("should correctly identify states that require conversation entry", () => {
   const states = ["pending", "collectingReason", "awaitingReview", "approved", "declined"];

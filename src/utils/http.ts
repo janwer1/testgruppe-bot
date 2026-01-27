@@ -3,5 +3,5 @@
  * Can be used for health checks and root path handlers.
  */
 export const createHealthCheckResponse = (): Response => {
-    return new Response("Bot is running", { status: 200 });
+  return new Response("Bot is running", { status: 200 });
 };

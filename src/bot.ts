@@ -1,25 +1,35 @@
 import { Bot } from "grammy";
-import { BotContext } from "./types";
-import { registerJoinRequestHandler } from "./handlers/joinRequest";
-import { registerCallbackHandlers } from "./handlers/callbacks";
+import type { BotConfig } from "./config";
 import { registerAdminHandlers } from "./handlers/admin";
-import { joinRequestRepository } from "./repositories/JoinRequestRepository";
-import { env } from "./env";
+import { registerCallbackHandlers } from "./handlers/callbacks";
+import { registerJoinRequestHandler } from "./handlers/joinRequest";
+import type { IJoinRequestRepository } from "./repositories/JoinRequestRepository";
 import { logger } from "./services/logger";
+import type { BotContext } from "./types";
 
-export function createBot(): Bot<BotContext> {
-  const bot = new Bot<BotContext>(env.BOT_TOKEN);
+export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<BotContext> {
+  const bot = new Bot<BotContext>(config.botToken);
 
   // Stateless architecture: Loads state from Redis on every request.
+
+  // Inject dependencies into context
+  bot.use(async (ctx, next) => {
+    ctx.config = config;
+    ctx.repo = repo;
+    await next();
+  });
 
   // Request logging middleware
   bot.use(async (ctx, next) => {
     // Only log strictly interesting events
     if (ctx.chat?.type === "private" && ctx.message?.text) {
-      logger.info({
-        userId: ctx.from?.id,
-        text: ctx.message.text,
-      }, "Private Message Received");
+      logger.info(
+        {
+          userId: ctx.from?.id,
+          text: ctx.message.text,
+        },
+        "Private Message Received",
+      );
     }
     await next();
   });
@@ -40,10 +50,11 @@ export function createBot(): Bot<BotContext> {
     const userId = ctx.from.id;
 
     // Load active request state
-    const request = await joinRequestRepository.findByUserId(userId);
+    const request = await repo.findByUserId(userId);
 
     if (!request) {
-      if (env.MODE === "dev") {
+      // Access MODE from process.env directly or add to config if critical
+      if (process.env.NODE_ENV !== "production") {
         console.log(`[Router] Ignored message from ${userId}: No active request`);
       }
       return;
@@ -51,12 +62,16 @@ export function createBot(): Bot<BotContext> {
 
     // Verify security: Request must belong to message sender
     if (request.getContext().userId !== userId) {
-      console.error(`[Router] Security Mismatch! Loaded request for ${request.getContext().userId} but msg from ${userId}`);
+      console.error(
+        `[Router] Security Mismatch! Loaded request for ${request.getContext().userId} but msg from ${userId}`,
+      );
       return;
     }
 
-    if (request.getContext().targetChatId !== env.TARGET_CHAT_ID) {
-      console.warn(`[Router] Target chat mismatch. Request: ${request.getContext().targetChatId}, Env: ${env.TARGET_CHAT_ID}`);
+    if (request.getContext().targetChatId !== config.targetChatId) {
+      console.warn(
+        `[Router] Target chat mismatch. Request: ${request.getContext().targetChatId}, Config: ${config.targetChatId}`,
+      );
       return;
     }
 
@@ -71,18 +86,18 @@ export function createBot(): Bot<BotContext> {
     if (currentState === "collectingReason") {
       const { validateReason } = await import("./utils/validation");
 
-      const validation = validateReason(text);
+      const validation = validateReason(text, config);
       if (!validation.success) {
         await ctx.reply(validation.error || "Invalid input");
         return;
       }
 
-      const reason = validation.data!;
+      const reason = validation.data;
 
       // Update State
       request.submitReason(reason);
       // Ensure reason is saved even if posting to admin group fails
-      await joinRequestRepository.save(request);
+      await repo.save(request);
 
       // Post Review Card
       const user = ctx.from;
@@ -101,26 +116,27 @@ export function createBot(): Bot<BotContext> {
       };
 
       const { postReviewCard } = await import("./services/reviewCard");
-      const adminMsgId = await postReviewCard(ctx.api, reviewCardData);
+      const adminMsgId = await postReviewCard(ctx.api, reviewCardData, config);
 
       const { getMessage } = await import("./templates/messages");
 
       if (adminMsgId) {
         request.setAdminMsgId(adminMsgId);
-        await joinRequestRepository.save(request); // Save adminMsgId
+        await repo.save(request); // Save adminMsgId
 
         await ctx.reply(getMessage("thank-you"));
       } else {
         console.error(`[Router] Failed to post review card for user ${userId}`);
-        await ctx.reply("Your request has been saved, but we couldn't notify the admins immediately. We will review it shortly.");
+        await ctx.reply(
+          "Your request has been saved, but we couldn't notify the admins immediately. We will review it shortly.",
+        );
       }
       return;
     }
 
     if (currentState === "awaitingReview") {
-
       const { validateAdditionalMessage } = await import("./utils/validation");
-      const validation = validateAdditionalMessage(text);
+      const validation = validateAdditionalMessage(text, config);
 
       if (!validation.success) {
         // Silent fail or soft warn? Let's warn softly
@@ -128,11 +144,11 @@ export function createBot(): Bot<BotContext> {
         return;
       }
 
-      const message = validation.data!;
+      const message = validation.data;
 
       // Update State
       request.addMessage(message);
-      await joinRequestRepository.save(request); // PERSIST IMMEDIATELY
+      await repo.save(request); // PERSIST IMMEDIATELY
 
       const { getMessage } = await import("./templates/messages");
 
@@ -151,7 +167,7 @@ export function createBot(): Bot<BotContext> {
             additionalMessages: context.additionalMessages,
           };
 
-          await appendMessageToReviewCard(ctx.api, context.adminMsgId, reviewCardData);
+          await appendMessageToReviewCard(ctx.api, context.adminMsgId, reviewCardData, config);
         } catch (error) {
           console.error(`[Router] Failed to update admin card for user ${userId}:`, error);
         }
@@ -163,8 +179,6 @@ export function createBot(): Bot<BotContext> {
       return;
     }
   });
-
-
 
   // Register other handlers
   registerJoinRequestHandler(bot);

@@ -1,15 +1,23 @@
 import "dotenv/config";
 import { createBot } from "./bot";
-import { env } from "./env";
+import { createConfigFromEnv } from "./config";
+import { parseEnv } from "./env";
+import { JoinRequestRepository } from "./repositories/JoinRequestRepository";
+import { createStateStore } from "./services/state";
 
 async function main() {
+  const env = parseEnv();
+
   if (env.MODE !== "dev") {
     console.error("This script is for development mode only. Set MODE=dev");
     process.exit(1);
   }
 
-  const bot = createBot();
+  const config = createConfigFromEnv(env);
+  const store = createStateStore(config);
+  const repo = new JoinRequestRepository(store, config);
 
+  const bot = createBot(config, repo);
 
   // Delete webhook to allow getUpdates (long polling)
   try {
@@ -28,12 +36,12 @@ async function main() {
     await bot.stop();
 
     // Always restore webhook on exit (using env vars)
-    if (env.PUBLIC_BASE_URL && env.WEBHOOK_PATH) {
-      const webhookUrl = `${env.PUBLIC_BASE_URL}${env.WEBHOOK_PATH}`;
+    if (config.webhookUrl && env.WEBHOOK_PATH) {
+      const webhookUrl = `${config.webhookUrl}${env.WEBHOOK_PATH}`;
       console.log(`🔄 Restoring webhook to: ${webhookUrl}`);
       try {
         await bot.api.setWebhook(webhookUrl, {
-          secret_token: env.WEBHOOK_SECRET_TOKEN,
+          secret_token: config.webhookSecret,
           drop_pending_updates: false,
         });
         console.log("✅ Webhook restored.");
