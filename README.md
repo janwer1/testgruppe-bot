@@ -64,8 +64,6 @@ The bot is configured to run as a Cloudflare Worker using the entry point at `sr
 
 ### 2. Set Environment Variables in Cloudflare
 
-### 2. Set Environment Variables in Cloudflare
-
 Ensure all production variables defined in `.env.example` are set in your Cloudflare Worker environment.
 
 ### 3. Deploy
@@ -82,6 +80,9 @@ After deployment, register your Worker URL with Telegram:
 bun run webhook:setup
 ```
 
+> [!TIP]
+> If you deploy using Cloudflare build from GitHub, this runs automatically via the `postinstall` script in `package.json`.
+
 ## Environment Variables
 
 See `.env.example` for the complete list of available configuration options.
@@ -96,43 +97,6 @@ See `.env.example` for the complete list of available configuration options.
 6. Bot verifies admin is authorized (must be admin in both chats)
 7. Bot processes the request and updates the review card
 8. User is notified of the decision
-
-## Scripts
-
-- `bun run dev`: Start development mode (long polling)
-- `bun run deploy`: Deploy to Cloudflare Workers
-- `bun run test`: Run the test suite
-- `bun run webhook:setup`: Set production webhook
-- `bun run webhook:get`: Fetch current webhook status
-- `bun run webhook:test`: Simulate a webhook call
-
-## Project Structure
-
-```
-.
-├── src/
-│   ├── bot.ts              # Core bot initialization
-│   ├── dev.ts              # Local long polling entry point
-│   ├── worker.ts           # Cloudflare Worker entry point
-│   ├── env.ts              # Resilient environment validation
-│   ├── types.ts            # TypeScript types
-│   ├── handlers/          # Event handlers
-│   │   ├── joinRequest.ts
-│   │   ├── callbacks.ts
-│   │   └── errors.ts
-│   ├── repositories/      # Data access
-│   │   └── JoinRequestRepository.ts
-│   ├── scripts/           # Management scripts
-│   │   └── webhook.ts     # Unified webhook management
-│   └── services/          # Business logic
-│       ├── authz.ts
-│       ├── reviewCard.ts
-│       └── state.ts
-├── wrangler.jsonc         # Cloudflare configuration
-├── package.json
-├── tsconfig.json
-└── bunfig.toml
-```
 
 ## License
 
