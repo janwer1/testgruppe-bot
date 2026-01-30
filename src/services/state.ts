@@ -6,7 +6,7 @@ export interface RequestState {
   userId: number;
   adminMsgId?: number;
   reason?: string;
-  userName: string;
+  displayName: string;
   username?: string;
   timestamp: number;
   additionalMessages: string[]; // Always initialized, never optional

@@ -7,7 +7,7 @@ export interface JoinRequestContext {
   requestId: string;
   userId: number;
   targetChatId: number;
-  userName: string;
+  displayName: string;
   username?: string;
   reason?: string;
   additionalMessages: string[];

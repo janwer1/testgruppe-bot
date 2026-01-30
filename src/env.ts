@@ -45,7 +45,7 @@ const envSchema = {
     ),
   WEBHOOK_SECRET_TOKEN: z.string().optional(),
   REASON_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
-  MAX_REASON_CHARS: z.coerce.number().int().positive().default(500),
+  MAX_REASON_CHARS: z.coerce.number().int().positive().default(1000),
   MIN_REASON_WORDS: z.coerce.number().int().positive().default(10),
   TIMEZONE: z.string().default("Europe/Berlin"),
   DROP_PENDING_UPDATES_ON_DEV_START: z

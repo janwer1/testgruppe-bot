@@ -20,7 +20,7 @@ export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
       // Generate unique request ID using ULID (Universally Unique Lexicographically Sortable Identifier)
       // This allows sorting by ID to equate to sorting by time
       const requestId = ulid();
-      const userName = `${user.first_name}${user.last_name ? ` ${user.last_name}` : ""}`;
+      const displayName = `${user.first_name}${user.last_name ? ` ${user.last_name}` : ""}`;
 
       // Stateless architecture: all state is persisted via JoinRequestRepository
 
@@ -32,7 +32,7 @@ export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
         requestId,
         userId,
         targetChatId,
-        userName,
+        displayName,
         username: user.username,
         timestamp: Date.now(),
       };
@@ -50,7 +50,10 @@ export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
 
         const recipientId = joinRequest.user_chat_id || userId;
 
-        await ctx.api.sendMessage(recipientId, getMessage("welcome", { minWords: ctx.config.minReasonWords }));
+        await ctx.api.sendMessage(
+          recipientId,
+          getMessage("welcome", { minWords: ctx.config.minReasonWords, maxChars: ctx.config.maxReasonChars }),
+        );
       } catch (dmError) {
         console.error("Failed to send DM to user:", dmError);
 
@@ -59,7 +62,7 @@ export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
         // Still post a review card to admins indicating DM failed
         const reviewCardData = {
           userId,
-          userName,
+          displayName,
           username: user.username,
           reason: failureReason,
           timestamp: new Date(),

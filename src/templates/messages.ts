@@ -17,14 +17,16 @@ type MessageKey =
   | "action-success-declined"
   | "error-approving"
   | "error-declining"
+  | "already-approved"
+  | "already-declined"
   | "msg-added"
   | "error-adding-msg";
 
 // biome-ignore lint/suspicious/noExplicitAny: generic message arguments
 const messages: Record<MessageKey, string | ((args: any) => string)> = {
   // General messages
-  welcome: (args: { minWords: number }) =>
-    `👋 Hallo! Um deine Anfrage abzuschließen, antworte bitte mit einer kurzen Begründung (mind. ${args.minWords} Wörter), warum du beitreten möchtest.`,
+  welcome: (args: { minWords: number; maxChars: number }) =>
+    `👋 Hallo! Um deine Anfrage abzuschließen, antworte bitte mit einer kurzen Begründung (mind. ${args.minWords} Wörter, max. ${args.maxChars} Zeichen), warum du beitreten möchtest.`,
   "invalid-input": "⚠️ Bitte sende eine Textnachricht mit deiner Begründung.",
   "error-generic": "⚠️ Entschuldigung, ich habe keine gültige Textnachricht erhalten. Bitte versuche es erneut.",
   "thank-you": "Danke! Deine Anfrage wurde zur Überprüfung eingereicht. 📨",
@@ -47,6 +49,8 @@ const messages: Record<MessageKey, string | ((args: any) => string)> = {
   "action-success-declined": "Anfrage abgelehnt!",
   "error-approving": "Fehler beim Genehmigen der Anfrage.",
   "error-declining": "Fehler beim Ablehnen der Anfrage.",
+  "already-approved": "✅ Benutzer ist bereits in der Gruppe. Status wurde synchronisiert.",
+  "already-declined": "✅ Benutzer ist bereits nicht mehr in der Gruppe. Status wurde synchronisiert.",
   "msg-added": "✅ Nachricht hinzugefügt. Die Admins wurden benachrichtigt.",
   "error-adding-msg": "⚠️ Fehler beim Hinzufügen der Nachricht.",
 };

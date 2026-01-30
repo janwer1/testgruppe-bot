@@ -171,7 +171,7 @@ export class JoinRequest {
       requestId: context.requestId,
       userId: context.userId,
       targetChatId: context.targetChatId,
-      userName: context.userName,
+      displayName: context.displayName,
       username: context.username,
       timestamp: context.timestamp,
     };

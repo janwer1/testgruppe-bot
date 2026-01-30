@@ -4,7 +4,7 @@ import { formatReviewCardMessage, formatUpdatedReviewCardMessage } from "../temp
 
 export interface ReviewCardData {
   userId: number;
-  userName: string;
+  displayName: string;
   username?: string;
   reason: string;
   timestamp: Date;

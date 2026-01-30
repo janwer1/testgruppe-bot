@@ -9,7 +9,7 @@ function createRequestInState(state: string, requestId: string = "test-request-i
     requestId,
     userId: 12345,
     targetChatId: -1001234567890,
-    userName: "Test User",
+    displayName: "Test User",
     username: "testuser",
     timestamp: Date.now(),
     config: mockConfig,

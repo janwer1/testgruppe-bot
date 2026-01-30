@@ -88,6 +88,9 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
 
       const validation = validateReason(text, config);
       if (!validation.success) {
+        console.log(
+          `[Router] Validation failed for user ${userId}: ${validation.error} (text length: ${text.length} chars)`,
+        );
         await ctx.reply(validation.error || "Invalid input");
         return;
       }
@@ -103,11 +106,11 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
       const user = ctx.from;
       const firstName = user.first_name || "User";
       const lastName = user.last_name || "";
-      const userName = `${firstName}${lastName ? ` ${lastName}` : ""}`.trim();
+      const displayName = `${firstName}${lastName ? ` ${lastName}` : ""}`.trim();
 
       const reviewCardData = {
         userId: request.getContext().userId,
-        userName,
+        displayName,
         username: user.username,
         reason,
         timestamp: new Date(request.getContext().timestamp),
@@ -159,7 +162,7 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
           const { appendMessageToReviewCard } = await import("./services/reviewCard");
           const reviewCardData = {
             userId: context.userId,
-            userName: context.userName,
+            displayName: context.displayName,
             username: context.username,
             reason: context.reason || "",
             timestamp: new Date(context.timestamp),

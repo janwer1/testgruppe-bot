@@ -23,7 +23,7 @@ test("createReviewCardKeyboard should include request ID in callback data", () =
 test("ReviewCardData should accept valid review card data", () => {
   const data: ReviewCardData = {
     userId: 12345,
-    userName: "Test User",
+    displayName: "Test User",
     username: "testuser",
     reason: "Test reason",
     timestamp: new Date(),
@@ -32,7 +32,7 @@ test("ReviewCardData should accept valid review card data", () => {
   };
 
   expect(data.userId).toBe(12345);
-  expect(data.userName).toBe("Test User");
+  expect(data.displayName).toBe("Test User");
   expect(data.reason).toBe("Test reason");
   expect(data.additionalMessages).toHaveLength(2);
 });
@@ -40,7 +40,7 @@ test("ReviewCardData should accept valid review card data", () => {
 test("ReviewCardData should accept data without username", () => {
   const data: ReviewCardData = {
     userId: 12345,
-    userName: "Test User",
+    displayName: "Test User",
     reason: "Test reason",
     timestamp: new Date(),
     requestId: "test-123",
@@ -52,7 +52,7 @@ test("ReviewCardData should accept data without username", () => {
 test("ReviewCardData should accept data without additional messages", () => {
   const data: ReviewCardData = {
     userId: 12345,
-    userName: "Test User",
+    displayName: "Test User",
     reason: "Test reason",
     timestamp: new Date(),
     requestId: "test-123",

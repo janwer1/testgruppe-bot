@@ -21,7 +21,7 @@ export function createTestRequestInput(overrides: Partial<JoinRequestInput> = {}
     requestId: `test-request-${Date.now()}-${Math.random()}`,
     userId: 12345,
     targetChatId: -1001234567890,
-    userName: "Test User",
+    displayName: "Test User",
     username: "testuser",
     timestamp: Date.now(),
     config: mockConfig,

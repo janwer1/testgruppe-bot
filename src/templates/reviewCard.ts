@@ -16,7 +16,7 @@ export function formatReviewCardMessage(data: ReviewCardData, timezone: string):
   return `
 📋 Neue Beitrittsanfrage - Bitte prüfen
 
-👤 Nutzer: ${data.userName}${userHandle}
+👤 Nutzer: ${data.displayName}${userHandle}
 🆔 ID: ${data.userId}
 🕐 Zeitpunkt: ${dateStr}
 
@@ -38,7 +38,7 @@ export function formatUpdatedReviewCardMessage(
   return `
 ${statusHeader}
 
-👤 Nutzer: ${data.userName}${userHandle}
+👤 Nutzer: ${data.displayName}${userHandle}
 🆔 ID: ${data.userId}
 
 📝 Begründung:

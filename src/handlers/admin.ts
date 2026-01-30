@@ -53,7 +53,7 @@ function formatRequestList(requests: JoinRequest[], timezone: string): string {
 
     const date = formatDate(context.timestamp, timezone);
 
-    message += `${statusIcon} <b>${context.userName}</b>`;
+    message += `${statusIcon} <b>${context.displayName}</b>`;
     if (context.username) message += ` (@${context.username})`;
     message += `\n📅 ${date}`;
     message += `\n🆔 <code>${context.requestId.substring(0, 8)}</code>`;
