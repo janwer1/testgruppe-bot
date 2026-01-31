@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { JoinRequest } from "../domain/JoinRequest";
-import { MemoryStateStore } from "../services/state";
-import { createTestRequestInput, mockConfig } from "../utils/test-fixtures";
+import { JoinRequest } from "../../domain/JoinRequest";
+import { createTestRequestInput, mockConfig } from "../../shared/utils/test-fixtures";
 import { JoinRequestRepository } from "./JoinRequestRepository";
+import { MemoryStateStore } from "./state";
 
 test("should create a new join request", async () => {
   const store = new MemoryStateStore(mockConfig);
@@ -92,4 +92,41 @@ test("should return undefined for non-existent user", async () => {
   const repository = new JoinRequestRepository(store, mockConfig);
   const found = await repository.findByUserId(999999);
   expect(found).toBeUndefined();
+});
+
+test("should correctly filter pending vs completed requests (buried request regression)", async () => {
+  const store = new MemoryStateStore(mockConfig);
+  const repository = new JoinRequestRepository(store, mockConfig);
+
+  // 1. Create 5 COMPLETED requests (older)
+  for (let i = 0; i < 5; i++) {
+    const input = createTestRequestInput({ requestId: `completed-${i}`, userId: 100 + i });
+    const req = await repository.create(input);
+    req.startCollection();
+    req.submitReason("Valid reason correctly provided here");
+    req.approve(1, "Admin");
+    await repository.save(req);
+  }
+
+  // 2. Create 10 PENDING requests (newer)
+  for (let i = 0; i < 10; i++) {
+    const input = createTestRequestInput({ requestId: `pending-${i}`, userId: 200 + i });
+    await repository.create(input);
+  }
+
+  // 3. Try to find the 5 completed requests using findRecent(10)
+  // OLD: const recent = await repository.findRecent(10);
+  // NEW: explicitly ask for completed
+
+  const completed = await repository.findRecentByStatus({ status: "completed", limit: 10 });
+  const pending = await repository.findRecentByStatus({ status: "pending", limit: 10 });
+
+  console.log(`Found ${pending.length} pending and ${completed.length} completed.`);
+
+  // If our fix is correct:
+  // pending.length should be 10 (out of 10 created)
+  // completed.length should be 5 (out of 5 created, even if older)
+
+  expect(pending.length).toBe(10);
+  expect(completed.length).toBe(5);
 });

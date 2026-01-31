@@ -1,8 +1,9 @@
 import type { Bot } from "grammy";
 import { InlineKeyboard } from "grammy";
-import type { JoinRequest } from "../domain/JoinRequest";
-import type { BotContext } from "../types";
-import { formatDate } from "../utils/date";
+import type { JoinRequest } from "../../domain/JoinRequest";
+import { logger } from "../../shared/logger";
+import { formatDate } from "../../shared/utils/date";
+import type { BotContext } from "../../types";
 
 /**
  * Check if user is authorized to use admin commands
@@ -24,7 +25,7 @@ async function checkAdminAuth(ctx: BotContext): Promise<boolean> {
         isAuthorized = true;
       }
     } catch (e) {
-      console.error(`[Admin] Failed to verify admin status for user ${userId}:`, e);
+      logger.error({ err: e, userId }, "[Admin] Failed to verify admin status");
     }
   }
 
@@ -96,13 +97,7 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
 
     await ctx.reply(`Fetching last ${limit} pending requests...`);
 
-    const recentRequests = await ctx.repo.findRecent(limit);
-
-    // Filter for pending states
-    const pendingRequests = recentRequests.filter((req) => {
-      const state = req.getState();
-      return state === "pending" || state === "collectingReason" || state === "awaitingReview";
-    });
+    const pendingRequests = await ctx.repo.findRecentByStatus({ status: "pending", limit });
 
     const message = `<b>Pending Join Requests</b>\n\n${formatRequestList(pendingRequests, ctx.config.timezone)}`;
     await ctx.reply(message, { parse_mode: "HTML" });
@@ -119,13 +114,7 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
 
     await ctx.reply(`Fetching last ${limit} completed requests...`);
 
-    const recentRequests = await ctx.repo.findRecent(limit);
-
-    // Filter for completed states
-    const completedRequests = recentRequests.filter((req) => {
-      const state = req.getState();
-      return state === "approved" || state === "declined";
-    });
+    const completedRequests = await ctx.repo.findRecentByStatus({ status: "completed", limit });
 
     const message = `<b>Completed Join Requests</b>\n\n${formatRequestList(completedRequests, ctx.config.timezone)}`;
     await ctx.reply(message, { parse_mode: "HTML" });
@@ -143,22 +132,15 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
     await ctx.answerCallbackQuery();
 
     const limit = 10;
-    const recentRequests = await ctx.repo.findRecent(limit);
 
     let filteredRequests: JoinRequest[];
     let title: string;
 
     if (action === "pending") {
-      filteredRequests = recentRequests.filter((req) => {
-        const state = req.getState();
-        return state === "pending" || state === "collectingReason" || state === "awaitingReview";
-      });
+      filteredRequests = await ctx.repo.findRecentByStatus({ status: "pending", limit });
       title = "Pending Join Requests";
     } else {
-      filteredRequests = recentRequests.filter((req) => {
-        const state = req.getState();
-        return state === "approved" || state === "declined";
-      });
+      filteredRequests = await ctx.repo.findRecentByStatus({ status: "completed", limit });
       title = "Completed Join Requests";
     }
 

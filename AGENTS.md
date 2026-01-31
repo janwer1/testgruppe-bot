@@ -5,7 +5,7 @@
 - **Platform**: Cloudflare Workers (Edge)
 - **Framework**: grammY (Stateless mode)
 - **State Logic**: XState v5 (Domain-driven)
-- **Storage**: Upstash Redis (REST API)
+- **Storage**: Cloudflare D1 (SQLite)
 - **Runtime**: Bun (Local Dev & Tests)
 - **Code Quality**: Biome (Linter & Formatter)
 
@@ -20,12 +20,12 @@ Environment variables are validated via `zod` in `src/env.ts` and mapped to a `B
 
 ### Statelessness & State Hydration
 
-Local memory/sessions are **not** used. All state is hydrated from Redis per-request:
+Local memory/sessions are **not** used. All state is hydrated from D1 per-request:
 1. Fetch `userId` or `requestId` from the incoming Update.
-2. Load the encrypted state from Redis via `JoinRequestRepository`.
+2. Load the persisted state from D1 via `JoinRequestRepository`.
 3. Hydrate a `JoinRequest` domain instance (which manages the XState machine).
 4. Apply logic/transitions.
-5. Persist the updated state back to Redis.
+5. Persist the updated state back to D1.
 
 ### Testing & Fixtures
 

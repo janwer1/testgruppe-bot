@@ -1,6 +1,6 @@
 import { assign, setup } from "xstate";
-import type { BotConfig } from "../config";
-import { validateAdditionalMessage, validateReason } from "../utils/validation";
+import type { BotConfig } from "../shared/config";
+import { validateAdditionalMessage, validateReason } from "./validation";
 
 export interface JoinRequestContext {
   config: BotConfig;

@@ -147,5 +147,8 @@ vite.config.ts.timestamp-*
 
 # wrangler files
 .wrangler
-.dev.vars*
-!.dev.vars.example
+wrangler.jsonc
+wrangler.toml
+
+# Local DB
+.data

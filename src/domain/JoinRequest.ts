@@ -1,7 +1,7 @@
-import { type Actor, createActor } from "xstate";
-import { validateAdditionalMessage, validateReason } from "../utils/validation";
+import { type Actor, createActor, type SnapshotFrom } from "xstate";
 import type { JoinRequestContext, JoinRequestInput } from "./joinRequestMachine";
 import { joinRequestMachine } from "./joinRequestMachine";
+import { validateAdditionalMessage, validateReason } from "./validation";
 
 /**
  * Domain model for a join request with XState state machine
@@ -16,6 +16,13 @@ export class JoinRequest {
     });
     this.actor.start();
     this.syncContext();
+  }
+
+  /**
+   * Subscribe to state machine updates
+   */
+  subscribe(callback: (snapshot: SnapshotFrom<typeof joinRequestMachine>) => void) {
+    return this.actor.subscribe(callback);
   }
 
   /**
@@ -161,7 +168,7 @@ export class JoinRequest {
   }
 
   /**
-   * Create from persisted context (for restoration from Redis)
+   * Create from persisted context (for restoration from D1)
    * In a stateless environment, restores the machine to the correct state based on persisted data
    */
   static fromContext(context: JoinRequestContext): JoinRequest {

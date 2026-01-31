@@ -1,5 +1,5 @@
-import type { ReviewCardData } from "../services/reviewCard";
-import { formatDate } from "../utils/date";
+import type { ReviewCardData } from "../application/services/reviewCard";
+import { formatDate } from "../shared/utils/date";
 
 export function formatReviewCardMessage(data: ReviewCardData, timezone: string): string {
   const dateStr = formatDate(new Date(data.timestamp), timezone, {

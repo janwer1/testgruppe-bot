@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mockConfig } from "./test-fixtures";
+import { mockConfig } from "../shared/utils/test-fixtures";
 import { validateAdditionalMessage, validateReason } from "./validation";
 
 test("validateReason should accept valid reason", () => {

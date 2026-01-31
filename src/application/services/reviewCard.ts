@@ -1,6 +1,7 @@
 import { type Api, Bot, InlineKeyboard } from "grammy";
-import type { BotConfig } from "../config";
-import { formatReviewCardMessage, formatUpdatedReviewCardMessage } from "../templates/reviewCard";
+import type { BotConfig } from "../../shared/config";
+import { logger } from "../../shared/logger";
+import { formatReviewCardMessage, formatUpdatedReviewCardMessage } from "../../templates/reviewCard";
 
 export interface ReviewCardData {
   userId: number;
@@ -36,15 +37,16 @@ async function withAdminChatIdRetry<T>(
     // Handle chat migration (group upgraded to supergroup)
     if (err?.error_code === 400 && err?.parameters?.migrate_to_chat_id) {
       const newChatId = err.parameters.migrate_to_chat_id;
-      console.warn(
-        `Chat ${chatId} was upgraded to supergroup ${newChatId}. Update ADMIN_REVIEW_CHAT_ID in your .env file.`,
+      logger.warn(
+        { oldChatId: chatId, newChatId },
+        "Chat was upgraded to supergroup. Update ADMIN_REVIEW_CHAT_ID in your .env file.",
       );
 
       // Retry with new chat ID
       try {
         return await fn(newChatId);
       } catch (retryError) {
-        console.error("Error after chat migration:", retryError);
+        logger.error({ err: retryError, newChatId }, "Error after chat migration");
         return undefined;
       }
     }
@@ -76,7 +78,7 @@ export async function postReviewCard(
 
     return result;
   } catch (error) {
-    console.error("Error posting review card:", error);
+    logger.error({ err: error, userId: data.userId }, "Error posting review card");
     return undefined;
   }
 }
@@ -103,7 +105,10 @@ export async function appendMessageToReviewCard(
       config,
     );
   } catch (error) {
-    console.error("Error appending message to review card:", error);
+    logger.error(
+      { err: error, messageId, userId: updatedReviewCardData.userId },
+      "Error appending message to review card",
+    );
   }
 }
 
@@ -128,6 +133,6 @@ export async function updateReviewCard(
       config,
     );
   } catch (error) {
-    console.error("Error updating review card:", error);
+    logger.error({ err: error, messageId, status }, "Error updating review card");
   }
 }

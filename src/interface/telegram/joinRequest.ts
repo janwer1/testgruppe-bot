@@ -1,9 +1,10 @@
 import { ulid } from "@std/ulid";
 import type { Bot } from "grammy";
-import type { JoinRequestInput } from "../domain/joinRequestMachine";
-import { postReviewCard } from "../services/reviewCard";
-import { getMessage } from "../templates/messages";
-import type { BotContext } from "../types";
+import { postReviewCard } from "../../application/services/reviewCard";
+import type { JoinRequestInput } from "../../domain/joinRequestMachine";
+import { logger } from "../../shared/logger";
+import { getMessage } from "../../templates/messages";
+import type { BotContext } from "../../types";
 import { handleError } from "./errors";
 
 export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
@@ -24,7 +25,7 @@ export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
 
       // Stateless architecture: all state is persisted via JoinRequestRepository
 
-      console.log(`[Join Request] User ${userId} requested to join. Request ID: ${requestId}`);
+      logger.info({ component: "JoinRequest", userId, requestId, targetChatId }, "Join Request Received");
 
       // Create join request using repository
       const input: JoinRequestInput = {
@@ -46,7 +47,7 @@ export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
 
       // Try to send DM with the welcome message
       try {
-        console.log(`[Join Request] Sending welcome DM to user ${userId}...`);
+        logger.debug({ component: "JoinRequest", userId }, "Sending welcome DM");
 
         const recipientId = joinRequest.user_chat_id || userId;
 
@@ -55,7 +56,7 @@ export function registerJoinRequestHandler(bot: Bot<BotContext>): void {
           getMessage("welcome", { minWords: ctx.config.minReasonWords, maxChars: ctx.config.maxReasonChars }),
         );
       } catch (dmError) {
-        console.error("Failed to send DM to user:", dmError);
+        logger.error({ component: "JoinRequest", err: dmError, userId }, "Failed to send DM to user");
 
         const failureReason = getMessage("dm-failed");
 

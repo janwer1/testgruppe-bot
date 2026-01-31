@@ -1,7 +1,8 @@
-import type { BotConfig } from "../config";
-import { JoinRequest } from "../domain/JoinRequest";
-import type { JoinRequestContext, JoinRequestInput } from "../domain/joinRequestMachine";
-import type { RequestState, StateStoreInterface } from "../services/state";
+import { JoinRequest } from "../../domain/JoinRequest";
+import type { JoinRequestContext, JoinRequestInput } from "../../domain/joinRequestMachine";
+import type { BotConfig } from "../../shared/config";
+import { logger } from "../../shared/logger";
+import type { RequestState, StateStoreInterface } from "./state";
 
 /**
  * Repository interface for join request persistence
@@ -11,12 +12,13 @@ export interface IJoinRequestRepository {
   findById(requestId: string): Promise<JoinRequest | undefined>;
   findByUserId(userId: number): Promise<JoinRequest | undefined>;
   findRecent(limit?: number): Promise<JoinRequest[]>;
+  findRecentByStatus(options: { status: "pending" | "completed"; limit?: number }): Promise<JoinRequest[]>;
   save(request: JoinRequest): Promise<void>;
 }
 
 /**
  * Repository implementation for domain persistence
- * Handles long-term storage of JoinRequest entities in Redis
+ * Handles long-term storage of JoinRequest entities in D1
  */
 export class JoinRequestRepository implements IJoinRequestRepository {
   private store: StateStoreInterface;
@@ -42,6 +44,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     // Persist initial state
     await this.save(request);
 
+    this.attachLogger(request);
     return request;
   }
 
@@ -75,7 +78,9 @@ export class JoinRequestRepository implements IJoinRequestRepository {
         : undefined,
     };
 
-    return JoinRequest.fromContext(context);
+    const request = JoinRequest.fromContext(context);
+    this.attachLogger(request);
+    return request;
   }
 
   /**
@@ -91,7 +96,17 @@ export class JoinRequestRepository implements IJoinRequestRepository {
   }
 
   /**
-   * Find recent requests
+   * Find recent requests with optional status filter
+   */
+  async findRecentByStatus(options: { status: "pending" | "completed"; limit?: number }): Promise<JoinRequest[]> {
+    const limit = options.limit || 10;
+    const requestIds = await this.store.getRecentRequests(limit, options.status);
+    const requests = await Promise.all(requestIds.map((id) => this.findById(id)));
+    return requests.filter((r): r is JoinRequest => r !== undefined);
+  }
+
+  /**
+   * Find recent requests (global)
    */
   async findRecent(limit: number = 10): Promise<JoinRequest[]> {
     const requestIds = await this.store.getRecentRequests(limit);
@@ -134,5 +149,25 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       // Clear pointer for finalized requests
       await this.store.clearUserActiveRequest(context.userId);
     }
+  }
+
+  private attachLogger(request: JoinRequest): void {
+    let previousState = request.getState();
+    request.subscribe((snapshot) => {
+      const currentState = snapshot.value as string;
+      if (currentState !== previousState) {
+        logger.info(
+          {
+            component: "Lifecycle",
+            requestId: snapshot.context.requestId,
+            userId: snapshot.context.userId,
+            from: previousState,
+            to: currentState,
+          },
+          "JoinRequest Lifecycle Transition",
+        );
+        previousState = currentState;
+      }
+    });
   }
 }

@@ -1,11 +1,13 @@
+import type { D1Database } from "@cloudflare/workers-types";
 import { type Bot, webhookCallback } from "grammy";
 import { createBot } from "./bot";
-import { createConfigFromEnv } from "./config";
-import { parseEnv } from "./env";
-import { JoinRequestRepository } from "./repositories/JoinRequestRepository";
-import { createStateStore } from "./services/state";
+import { JoinRequestRepository } from "./infrastructure/persistence/JoinRequestRepository";
+import { createStateStore } from "./infrastructure/persistence/state";
+import { createConfigFromEnv } from "./shared/config";
+import { parseEnv } from "./shared/env";
+import { logger } from "./shared/logger";
+import { createHealthCheckResponse } from "./shared/utils/http";
 import type { BotContext } from "./types";
-import { createHealthCheckResponse } from "./utils/http";
 
 let bot: Bot<BotContext>;
 let handler: (req: Request) => Promise<Response>;
@@ -14,9 +16,11 @@ export default {
   async fetch(request: Request, cfEnv: unknown, _ctx: unknown): Promise<Response> {
     // Initialize environment with Cloudflare bindings
     const env = parseEnv(cfEnv as Record<string, string | undefined>);
-    const config = createConfigFromEnv(env);
+    const db = (cfEnv as { DB: D1Database }).DB;
+    const config = createConfigFromEnv(env, db);
 
     const url = new URL(request.url);
+    logger.info({ component: "Worker", method: request.method, path: url.pathname }, "Incoming Request");
 
     // Webhook endpoint
     if (url.pathname === config.webhookPath) {
@@ -26,13 +30,16 @@ export default {
 
       try {
         // Lazy initialization of bot and handler using the current request's config
-        // strict singleton pattern might be tricky if config changes (unlikely in worker but possible with env bindings)
-        // For simplicity and safety in Workers, we can recreate or use a singleton if we are sure config is stable.
-        // Given standard Worker lifecycle, recreating is safe but expensive.
-        // Let's implement lazy singleton that updates if config changes? No, config comes from cfEnv.
-
         if (!bot) {
           const store = createStateStore(config);
+
+          // Auto-initialize D1 table if supported
+          if ("init" in store && typeof (store as { init?: unknown }).init === "function") {
+            logger.info({ component: "Worker" }, "Initializing StateStore...");
+            // biome-ignore lint/suspicious/noExplicitAny: StateStore might have optional init
+            await (store as any).init();
+          }
+
           const repo = new JoinRequestRepository(store, config);
           bot = createBot(config, repo);
           handler = webhookCallback(bot, "std/http", {
@@ -42,8 +49,10 @@ export default {
 
         return await handler(request);
       } catch (error) {
-        console.error("Error handling webhook:", error);
-        return new Response("Internal Server Error", { status: 500 });
+        logger.error({ err: error }, "❌ Error handling webhook");
+        return new Response(`Internal Server Error: ${error instanceof Error ? error.message : String(error)}`, {
+          status: 500,
+        });
       }
     }
 

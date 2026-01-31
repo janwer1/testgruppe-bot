@@ -1,10 +1,11 @@
 import type { Bot } from "grammy";
-import type { BotConfig } from "../config";
-import type { BotContext } from "../types";
+import type { BotConfig } from "../../shared/config";
+import { logger } from "../../shared/logger";
+import type { BotContext } from "../../types";
 
 export async function handleError(ctx: BotContext, error: unknown, context: string): Promise<void> {
-  const errorMessage = error instanceof Error ? error.message : "Unknown error";
-  console.error(`Error in ${context}:`, errorMessage, error);
+  const _errorMessage = error instanceof Error ? error.message : "Unknown error";
+  logger.error({ err: error, context }, "Error handled");
 
   // Try to answer callback query if it exists
   if (ctx.callbackQuery) {
@@ -33,6 +34,6 @@ ${errorMessage}
   try {
     await bot.api.sendMessage(config.adminReviewChatId, adminMessage);
   } catch (e) {
-    console.error("Failed to send error to admin group:", e);
+    logger.error({ err: e }, "Failed to send error to admin group");
   }
 }

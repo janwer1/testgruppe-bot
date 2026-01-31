@@ -1,6 +1,6 @@
 import type { Context } from "grammy";
-import type { BotConfig } from "./config";
-import type { IJoinRequestRepository } from "./repositories/JoinRequestRepository";
+import type { IJoinRequestRepository } from "./infrastructure/persistence/JoinRequestRepository";
+import type { BotConfig } from "./shared/config";
 
 /**
  * Bot context type - plain grammY Context without session

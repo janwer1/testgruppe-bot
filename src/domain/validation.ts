@@ -1,27 +1,29 @@
 import { z } from "zod";
-import type { BotConfig } from "../config";
+import type { BotConfig } from "../shared/config";
 import { getMessage } from "../templates/messages";
 
 function countWords(str: string): number {
   return str.trim().split(/\s+/).length;
 }
 
-// Base schema for any text message input - handles trimming and normalization
-const baseTextSchema = z
-  .string()
-  .trim()
-  .transform((val) => {
-    return val
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .replace(/\n{3,}/g, "\n\n");
-  });
+// Base schema factory for any text message input - handles trimming and normalization
+function getBaseTextSchema() {
+  return z
+    .string()
+    .trim()
+    .transform((val) => {
+      return val
+        .replace(/\r\n/g, "\n")
+        .replace(/\r/g, "\n")
+        .replace(/\n{3,}/g, "\n\n");
+    });
+}
 
 function getReasonSchema(config: BotConfig) {
   const maxChars = config.maxReasonChars;
   const minWords = config.minReasonWords;
 
-  return baseTextSchema.pipe(
+  return getBaseTextSchema().pipe(
     z
       .string()
       .min(1, getMessage("invalid-input"))
@@ -35,7 +37,7 @@ function getReasonSchema(config: BotConfig) {
 function getAdditionalMessageSchema(config: BotConfig) {
   const maxChars = config.maxReasonChars;
 
-  return baseTextSchema.pipe(
+  return getBaseTextSchema().pipe(
     z.string().min(1, getMessage("message-empty")).max(maxChars, getMessage("message-too-long", { maxChars })),
   );
 }

@@ -1,21 +1,34 @@
 import { Bot } from "grammy";
-import type { BotConfig } from "./config";
-import { registerAdminHandlers } from "./handlers/admin";
-import { registerCallbackHandlers } from "./handlers/callbacks";
-import { registerJoinRequestHandler } from "./handlers/joinRequest";
-import type { IJoinRequestRepository } from "./repositories/JoinRequestRepository";
-import { logger } from "./services/logger";
+import type { IJoinRequestRepository } from "./infrastructure/persistence/JoinRequestRepository";
+import { registerAdminHandlers } from "./interface/telegram/admin";
+import { registerCallbackHandlers } from "./interface/telegram/callbacks";
+import { registerJoinRequestHandler } from "./interface/telegram/joinRequest";
+import type { BotConfig } from "./shared/config";
+import { logger } from "./shared/logger";
 import type { BotContext } from "./types";
 
 export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<BotContext> {
   const bot = new Bot<BotContext>(config.botToken);
 
-  // Stateless architecture: Loads state from Redis on every request.
+  // Stateless architecture: Loads state from D1 on every request.
 
   // Inject dependencies into context
   bot.use(async (ctx, next) => {
     ctx.config = config;
     ctx.repo = repo;
+    await next();
+  });
+
+  // Debug: Log every update to ensure we are receiving them
+  bot.use(async (ctx, next) => {
+    logger.debug(
+      {
+        component: "Update",
+        updateId: ctx.update.update_id,
+        type: Object.keys(ctx.update).filter((k) => k !== "update_id")[0],
+      },
+      "Received Update",
+    );
     await next();
   });
 
@@ -25,6 +38,7 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
     if (ctx.chat?.type === "private" && ctx.message?.text) {
       logger.info(
         {
+          component: "Bot",
           userId: ctx.from?.id,
           text: ctx.message.text,
         },
@@ -55,22 +69,24 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
     if (!request) {
       // Access MODE from process.env directly or add to config if critical
       if (process.env.NODE_ENV !== "production") {
-        console.log(`[Router] Ignored message from ${userId}: No active request`);
+        logger.info({ userId }, "Ignored message: No active request");
       }
       return;
     }
 
     // Verify security: Request must belong to message sender
     if (request.getContext().userId !== userId) {
-      console.error(
-        `[Router] Security Mismatch! Loaded request for ${request.getContext().userId} but msg from ${userId}`,
+      logger.error(
+        { requestUserId: request.getContext().userId, messageUserId: userId },
+        "Security Mismatch! Loaded request for different user",
       );
       return;
     }
 
     if (request.getContext().targetChatId !== config.targetChatId) {
-      console.warn(
-        `[Router] Target chat mismatch. Request: ${request.getContext().targetChatId}, Config: ${config.targetChatId}`,
+      logger.warn(
+        { requestTargetChatId: request.getContext().targetChatId, configTargetChatId: config.targetChatId },
+        "Target chat mismatch",
       );
       return;
     }
@@ -84,13 +100,11 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
     const currentState = request.getState();
 
     if (currentState === "collectingReason") {
-      const { validateReason } = await import("./utils/validation");
+      const { validateReason } = await import("./domain/validation");
 
       const validation = validateReason(text, config);
       if (!validation.success) {
-        console.log(
-          `[Router] Validation failed for user ${userId}: ${validation.error} (text length: ${text.length} chars)`,
-        );
+        logger.info({ userId, error: validation.error, textLength: text.length }, "Validation failed");
         await ctx.reply(validation.error || "Invalid input");
         return;
       }
@@ -118,7 +132,7 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
         additionalMessages: [],
       };
 
-      const { postReviewCard } = await import("./services/reviewCard");
+      const { postReviewCard } = await import("./application/services/reviewCard");
       const adminMsgId = await postReviewCard(ctx.api, reviewCardData, config);
 
       const { getMessage } = await import("./templates/messages");
@@ -129,7 +143,7 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
 
         await ctx.reply(getMessage("thank-you"));
       } else {
-        console.error(`[Router] Failed to post review card for user ${userId}`);
+        logger.error({ userId }, "Failed to post review card");
         await ctx.reply(
           "Your request has been saved, but we couldn't notify the admins immediately. We will review it shortly.",
         );
@@ -138,7 +152,7 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
     }
 
     if (currentState === "awaitingReview") {
-      const { validateAdditionalMessage } = await import("./utils/validation");
+      const { validateAdditionalMessage } = await import("./domain/validation");
       const validation = validateAdditionalMessage(text, config);
 
       if (!validation.success) {
@@ -159,7 +173,7 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
       const context = request.getContext();
       if (context.adminMsgId) {
         try {
-          const { appendMessageToReviewCard } = await import("./services/reviewCard");
+          const { appendMessageToReviewCard } = await import("./application/services/reviewCard");
           const reviewCardData = {
             userId: context.userId,
             displayName: context.displayName,
@@ -172,10 +186,10 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
 
           await appendMessageToReviewCard(ctx.api, context.adminMsgId, reviewCardData, config);
         } catch (error) {
-          console.error(`[Router] Failed to update admin card for user ${userId}:`, error);
+          logger.error({ err: error, userId }, "Failed to update admin card");
         }
       } else {
-        console.warn(`[Router] Message added but no adminMsgId for user ${userId}`);
+        logger.warn({ userId }, "Message added but no adminMsgId");
       }
 
       await ctx.reply(getMessage("msg-added"));

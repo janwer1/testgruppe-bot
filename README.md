@@ -18,7 +18,7 @@ See [AGENTS.md](./AGENTS.md) for architectural details and implementation patter
 - **Framework**: grammY (core)
 - **State Engine**: XState v5 (Domain Logic)
 - **Environment**: T3 Env + Zod
-- **Storage**: Upstash Redis
+- **Storage**: Cloudflare D1 (SQLite)
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ See [AGENTS.md](./AGENTS.md) for architectural details and implementation patter
    ```
    Fill in the required variables (Bot Token, Chat IDs) in `.env`.
 
-   **Persistence:** Use Upstash Redis (`UPSTASH_*` variables) for production state persistence. Without it, the bot uses in-memory storage which resets on restart.
+   **Persistence**: Use Cloudflare D1 for state persistence. Ensure you have a D1 database bound to the worker (see `wrangler.example.toml`). Local development uses a local SQLite file in `.data/`.
 
 ## Development Mode
 

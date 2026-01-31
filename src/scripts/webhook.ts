@@ -1,24 +1,25 @@
 import "dotenv/config";
+import { logger } from "../shared/logger";
 
 async function getWebhook() {
-  const { parseEnv } = await import("../env");
-  const { createConfigFromEnv } = await import("../config");
-  const { createStateStore } = await import("../services/state");
-  const { JoinRequestRepository } = await import("../repositories/JoinRequestRepository");
+  const { parseEnv } = await import("../shared/env");
+  const { createConfigFromEnv } = await import("../shared/config");
+  const { createStateStore } = await import("../infrastructure/persistence/state");
+  const { JoinRequestRepository } = await import("../infrastructure/persistence/JoinRequestRepository");
   const { createBot } = await import("../bot");
 
   const env = parseEnv();
   const config = createConfigFromEnv(env);
 
   if (!config.botToken) {
-    console.log("ℹ️ Skipping webhook status fetch (BOT_TOKEN missing)");
+    logger.info({ component: "Webhook" }, "Skipping webhook status fetch (BOT_TOKEN missing)");
     return;
   }
   const store = createStateStore(config);
   const repo = new JoinRequestRepository(store, config);
   const bot = createBot(config, repo);
 
-  console.log("🔍 Fetching webhook info from Telegram...");
+  logger.info({ component: "Webhook" }, "Fetching webhook info from Telegram...");
   const info = await bot.api.getWebhookInfo();
 
   console.log("\n--- Webhook Status ---");
@@ -26,21 +27,20 @@ async function getWebhook() {
   console.log("----------------------\n");
 
   if (info.url) {
-    console.log(`✅ Webhook is ACTIVE: ${info.url}`);
+    logger.info({ component: "Webhook", url: info.url }, "Webhook is ACTIVE");
   } else {
-    console.log("ℹ️  No webhook set (using long polling or inactive)");
+    logger.info({ component: "Webhook" }, "No webhook set (using long polling or inactive)");
   }
 }
 
 async function setupWebhook(force = false) {
-  const { parseEnv } = await import("../env");
-  const { createConfigFromEnv } = await import("../config");
-  const { Bot } = await import("grammy");
+  const { parseEnv } = await import("../shared/env");
+  const { createConfigFromEnv } = await import("../shared/config");
 
   const isCI = process.env.CI === "true" || process.env.CF_PAGES === "1";
 
   if (!isCI && !force) {
-    console.log("ℹ️ Skipping webhook setup (not running in CI). Use --force to override.");
+    logger.info({ component: "Webhook" }, "Skipping webhook setup (not running in CI). Use --force to override.");
     return;
   }
 
@@ -53,51 +53,34 @@ async function setupWebhook(force = false) {
         "❌ CI Environment: BOT_TOKEN, PUBLIC_BASE_URL, or WEBHOOK_SECRET_TOKEN is missing. Webhook setup failed.",
       );
     }
-    console.log("ℹ️ Skipping webhook setup: BOT_TOKEN, PUBLIC_BASE_URL, or WEBHOOK_SECRET_TOKEN is missing.");
+    logger.info(
+      { component: "Webhook" },
+      "Skipping webhook setup: BOT_TOKEN, PUBLIC_BASE_URL, or WEBHOOK_SECRET_TOKEN is missing.",
+    );
     return;
   }
 
-  const bot = new Bot(config.botToken);
+  const { setBotWebhook } = await import("../shared/utils/dev-utils");
 
   if (!config.webhookUrl) {
     throw new Error("PUBLIC_BASE_URL (webhookUrl) is missing");
   }
 
-  const webhookUrl = new URL(config.webhookPath, config.webhookUrl).toString();
-  const maskedSecret =
-    config.webhookSecretToken.substring(0, 3) + "*".repeat(Math.max(0, config.webhookSecretToken.length - 3));
-
-  console.log(`🚀 Setting webhook to: ${webhookUrl}`);
-  console.log(`🔒 Using secret token: ${maskedSecret}`);
-
-  const result = await bot.api.setWebhook(webhookUrl, {
-    secret_token: config.webhookSecretToken,
-    drop_pending_updates: true,
-  });
-
-  if (result) {
-    console.log(`✅ Webhook set successfully!`);
-    const info = await bot.api.getWebhookInfo();
-    console.log("\n--- Telegram Webhook Info ---");
-    console.log(JSON.stringify(info, null, 2));
-    console.log("-----------------------------\n");
-  } else {
-    throw new Error("Telegram API returned false for setWebhook");
-  }
+  await setBotWebhook(config.webhookUrl, config);
 }
 
 async function testWebhook() {
-  const { parseEnv } = await import("../env");
-  const { createConfigFromEnv } = await import("../config");
+  const { parseEnv } = await import("../shared/env");
+  const { createConfigFromEnv } = await import("../shared/config");
 
   const env = parseEnv();
   const config = createConfigFromEnv(env);
   const baseUrl = config.webhookUrl || "http://localhost:8787";
   const url = new URL(config.webhookPath, baseUrl).toString();
 
-  console.log(`🚀 Simulating Telegram webhook call to: ${url}`);
+  logger.info({ component: "Webhook", url }, "Simulating Telegram webhook call");
   if (!config.webhookSecretToken) {
-    console.warn("⚠️  Warning: WEBHOOK_SECRET_TOKEN is not set in env");
+    logger.warn({ component: "Webhook" }, "Warning: WEBHOOK_SECRET_TOKEN is not set in env");
   }
 
   const payload = {
@@ -120,17 +103,17 @@ async function testWebhook() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Telegram-Bot-Api-Secret-Token": config.webhookSecretToken!, // Guaranteed to be defined by validation above
+      "X-Telegram-Bot-Api-Secret-Token": config.webhookSecretToken || "",
     },
     body: JSON.stringify(payload),
   });
 
-  console.log(`\nResponse Status: ${response.status} ${response.statusText}`);
+  logger.info({ component: "Webhook", status: response.status, statusText: response.statusText }, "Webhook Response");
   const text = await response.text();
-  console.log("Response Body:", text || "(empty)");
+  logger.info({ component: "Webhook" }, `Response Body: ${text || "(empty)"}`);
 
   if (response.ok) {
-    console.log("\n✅ Webhook processed successfully!");
+    logger.info({ component: "Webhook" }, "Webhook processed successfully!");
   } else {
     throw new Error("Webhook failed!");
   }
@@ -157,7 +140,7 @@ async function main() {
     }
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`❌ Error in ${command || "main"}:`, errorMessage);
+    logger.error({ component: "Webhook", command: command || "main" }, errorMessage);
     process.exit(1);
   }
 }

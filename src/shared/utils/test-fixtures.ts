@@ -1,5 +1,5 @@
+import type { JoinRequestInput } from "../../domain/joinRequestMachine";
 import type { BotConfig } from "../config";
-import type { JoinRequestInput } from "../domain/joinRequestMachine";
 
 export const mockConfig: BotConfig = {
   botToken: "test-token",
@@ -12,8 +12,9 @@ export const mockConfig: BotConfig = {
   webhookUrl: "https://test.com",
   webhookSecretToken: "secret",
   adminReviewChatId: -1002,
-  upstashRedisRestUrl: "https://redis",
-  upstashRedisRestToken: "token",
+  reasonTtlSeconds: 604800,
+  storageType: "memory",
+  db: undefined,
 };
 
 export function createTestRequestInput(overrides: Partial<JoinRequestInput> = {}): JoinRequestInput {

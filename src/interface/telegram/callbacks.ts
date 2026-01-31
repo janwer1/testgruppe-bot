@@ -1,8 +1,9 @@
 import type { Bot } from "grammy";
-import { isAdminInBothChats } from "../services/authz";
-import { updateReviewCard } from "../services/reviewCard";
-import { getMessage } from "../templates/messages";
-import type { BotContext } from "../types";
+import { isAdminInBothChats } from "../../application/services/authz";
+import { updateReviewCard } from "../../application/services/reviewCard";
+import { logger } from "../../shared/logger";
+import { getMessage } from "../../templates/messages";
+import type { BotContext } from "../../types";
 import { handleError, sendErrorToAdminGroup } from "./errors";
 
 export function registerCallbackHandlers(bot: Bot<BotContext>): void {
@@ -79,34 +80,29 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
       // Perform the action using domain model
       if (action === "approve") {
         try {
-          // First, check if user is already a chat member
+          // Only call the API if user is not already approved
           let userIsAlreadyApproved = false;
           try {
-            const member = await bot.api.getChatMember(context.targetChatId, context.userId);
-            // If user is already a member, administrator, or creator, they're approved
-            if (member.status === "member" || member.status === "administrator" || member.status === "creator") {
+            await bot.api.approveChatJoinRequest(context.targetChatId, context.userId);
+          } catch (apiError: unknown) {
+            // If error is USER_ALREADY_PARTICIPANT, treat as success (already approved)
+            const error = apiError as { description?: string };
+            if (error.description?.includes("USER_ALREADY_PARTICIPANT")) {
+              logger.info(
+                { component: "Callback", userId: context.userId },
+                "User already participant, treating as success",
+              );
               userIsAlreadyApproved = true;
-              console.log(`[Callback] User ${context.userId} is already in chat with status: ${member.status}`);
-            }
-          } catch (memberError) {
-            // User not found in chat, proceed with approval attempt
-            console.log(`[Callback] User ${context.userId} not in chat, will attempt approval`);
-          }
-
-          // Only call the API if user is not already approved
-          if (!userIsAlreadyApproved) {
-            try {
-              await bot.api.approveChatJoinRequest(context.targetChatId, context.userId);
-            } catch (apiError: unknown) {
-              // If error is USER_ALREADY_PARTICIPANT, treat as success
-              const error = apiError as { description?: string };
-              if (error.description?.includes("USER_ALREADY_PARTICIPANT")) {
-                console.log(`[Callback] User ${context.userId} already participant, treating as success`);
-                userIsAlreadyApproved = true;
-              } else {
-                // Re-throw other errors
-                throw apiError;
-              }
+            } else if (error.description?.includes("HIDE_REQUESTER_MISSING")) {
+              // Request no longer exists (cancelled or handled elsewhere)
+              logger.info(
+                { component: "Callback", userId: context.userId },
+                "Request missing, treating as already processed",
+              );
+              userIsAlreadyApproved = true;
+            } else {
+              // Re-throw other errors
+              throw apiError;
             }
           }
 
@@ -123,7 +119,10 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
           try {
             await bot.api.sendMessage(context.userId, getMessage("approved-user"));
           } catch (userError) {
-            console.error("Failed to notify user of approval:", userError);
+            logger.error(
+              { component: "Callback", err: userError, userId: context.userId },
+              "Failed to notify user of approval",
+            );
           }
 
           // Update review card
@@ -157,41 +156,26 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
         }
       } else if (action === "decline") {
         try {
-          // First, check if user is already NOT in chat (or was kicked/left)
+          // Only call the API if user is not already declined
           let userIsAlreadyDeclined = false;
           try {
-            const member = await bot.api.getChatMember(context.targetChatId, context.userId);
-            // If user left, was kicked, or is restricted, they're effectively declined
-            if (member.status === "left" || member.status === "kicked" || member.status === "restricted") {
+            await bot.api.declineChatJoinRequest(context.targetChatId, context.userId);
+          } catch (apiError: unknown) {
+            // If error is HIDE_REQUESTER_MISSING, treat as success (already handled/gone)
+            const error = apiError as { description?: string };
+            if (
+              error.description?.includes("USER_NOT_PARTICIPANT") ||
+              error.description?.includes("user not found") ||
+              error.description?.includes("HIDE_REQUESTER_MISSING")
+            ) {
+              logger.info(
+                { component: "Callback", userId: context.userId },
+                "User not participant or request missing, treating as success/already declined",
+              );
               userIsAlreadyDeclined = true;
-              console.log(`[Callback] User ${context.userId} already not in chat with status: ${member.status}`);
-            }
-          } catch (memberError) {
-            // User not found in chat, likely already declined or never joined
-            const error = memberError as { description?: string };
-            if (error.description?.includes("user not found") || error.description?.includes("USER_NOT_PARTICIPANT")) {
-              userIsAlreadyDeclined = true;
-              console.log(`[Callback] User ${context.userId} not found in chat, treating as already declined`);
-            }
-          }
-
-          // Only call the API if user is not already declined
-          if (!userIsAlreadyDeclined) {
-            try {
-              await bot.api.declineChatJoinRequest(context.targetChatId, context.userId);
-            } catch (apiError: unknown) {
-              // If error is USER_NOT_PARTICIPANT, treat as success
-              const error = apiError as { description?: string };
-              if (
-                error.description?.includes("USER_NOT_PARTICIPANT") ||
-                error.description?.includes("user not found")
-              ) {
-                console.log(`[Callback] User ${context.userId} not participant, treating as success`);
-                userIsAlreadyDeclined = true;
-              } else {
-                // Re-throw other errors
-                throw apiError;
-              }
+            } else {
+              // Re-throw other errors
+              throw apiError;
             }
           }
 
@@ -208,7 +192,10 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
           try {
             await bot.api.sendMessage(context.userId, getMessage("declined-user"));
           } catch (userError) {
-            console.error("Failed to notify user of decline:", userError);
+            logger.error(
+              { component: "Callback", err: userError, userId: context.userId },
+              "Failed to notify user of decline",
+            );
           }
 
           // Update review card
