@@ -144,11 +144,5 @@ vite.config.ts.timestamp-*
 
 .vercel
 .env*.local
-
-# wrangler files
 .wrangler
-wrangler.jsonc
-wrangler.toml
-
-# Local DB
 .data

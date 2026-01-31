@@ -1,0 +1,16 @@
+name = "testgruppe-bot"
+main = "src/worker.ts"
+compatibility_date = "2026-01-20"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[placement]
+region = "aws:eu-central-1"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "testgruppe-bot"
+database_id = "318546f6-7723-4b87-bada-cfd7ed355d67"
+remote = true
