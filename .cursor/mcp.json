@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cloudflare-docs-vectorize": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://docs.mcp.cloudflare.com/mcp"]
+    },
+    "cloudflare-workers-observability": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://observability.mcp.cloudflare.com/mcp"]
+    }
+  }
+}

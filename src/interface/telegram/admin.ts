@@ -12,6 +12,8 @@ import { isMessageNotModifiedError, safeAnswerCallbackQuery } from "./errors";
 async function checkAdminAuth(ctx: BotContext): Promise<boolean> {
   if (!ctx.chat || !ctx.from) return false;
 
+  // TODO: remove temp diagnostics
+  const authStart = Date.now();
   const chatId = ctx.chat.id;
   const userId = ctx.from.id;
   const isPrivate = ctx.chat.type === "private";
@@ -21,7 +23,10 @@ async function checkAdminAuth(ctx: BotContext): Promise<boolean> {
 
   if (!isAuthorized && isPrivate) {
     try {
+      const apiStart = Date.now();
+      logger.info({ component: "Admin", userId }, "Auth check: getChatMember start");
       const member = await ctx.api.getChatMember(ctx.config.adminReviewChatId, userId);
+      logger.info({ component: "Admin", userId, durationMs: Date.now() - apiStart }, "Auth check: getChatMember done");
       if (["creator", "administrator"].includes(member.status)) {
         isAuthorized = true;
       }
@@ -30,6 +35,7 @@ async function checkAdminAuth(ctx: BotContext): Promise<boolean> {
     }
   }
 
+  logger.info({ component: "Admin", userId, isAuthorized, durationMs: Date.now() - authStart }, "Auth check: done");
   return isAuthorized;
 }
 
@@ -89,6 +95,8 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
 
   // Pending requests command
   bot.command("pending", async (ctx) => {
+    // TODO: remove temp diagnostics
+    const commandStart = Date.now();
     const isAuthorized = await checkAdminAuth(ctx);
     if (!isAuthorized) return;
 
@@ -98,14 +106,25 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
 
     await ctx.reply(`Fetching last ${limit} pending requests...`);
 
+    const queryStart = Date.now();
     const pendingRequests = await ctx.repo.findRecentByStatus({ status: "pending", limit });
+    logger.info(
+      { component: "Admin", command: "pending", durationMs: Date.now() - queryStart, count: pendingRequests.length },
+      "Pending query: done",
+    );
 
     const message = `<b>Pending Join Requests</b>\n\n${formatRequestList(pendingRequests, ctx.config.timezone)}`;
     await ctx.reply(message, { parse_mode: "HTML" });
+    logger.info(
+      { component: "Admin", command: "pending", durationMs: Date.now() - commandStart },
+      "Pending command: done",
+    );
   });
 
   // Completed requests command
   bot.command("completed", async (ctx) => {
+    // TODO: remove temp diagnostics
+    const commandStart = Date.now();
     const isAuthorized = await checkAdminAuth(ctx);
     if (!isAuthorized) return;
 
@@ -115,10 +134,24 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
 
     await ctx.reply(`Fetching last ${limit} completed requests...`);
 
+    const queryStart = Date.now();
     const completedRequests = await ctx.repo.findRecentByStatus({ status: "completed", limit });
+    logger.info(
+      {
+        component: "Admin",
+        command: "completed",
+        durationMs: Date.now() - queryStart,
+        count: completedRequests.length,
+      },
+      "Completed query: done",
+    );
 
     const message = `<b>Completed Join Requests</b>\n\n${formatRequestList(completedRequests, ctx.config.timezone)}`;
     await ctx.reply(message, { parse_mode: "HTML" });
+    logger.info(
+      { component: "Admin", command: "completed", durationMs: Date.now() - commandStart },
+      "Completed command: done",
+    );
   });
 
   // Cleanup: list pending and optionally mark all as stale (declined)

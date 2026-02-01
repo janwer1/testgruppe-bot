@@ -119,4 +119,46 @@ export class D1StateStore implements StateStoreInterface {
 
     return results.map((r: { id: string }) => r.id);
   }
+
+  async getRecentRequestStates(
+    limit: number,
+    status?: "pending" | "completed",
+  ): Promise<Array<{ requestId: string; state: RequestState }>> {
+    const table = this.repo.table;
+    const decisionStatusCol = this.repo.proxy.decisionStatus;
+
+    let whereClause: SQL | undefined;
+
+    if (status === "pending") {
+      whereClause = isNull(decisionStatusCol);
+    } else if (status === "completed") {
+      whereClause = or(eq(decisionStatusCol, "approved"), eq(decisionStatusCol, "declined"));
+    }
+
+    // Use the repo wrapper so `data` is deserialized via superjson.
+    const rows = (await this.repo.query().where(whereClause).orderBy(desc(table.id)).limit(limit).all()) as Array<
+      { id: string } & DbRequestState
+    >;
+
+    return rows.map((row) => {
+      const data = row as unknown as DbRequestState;
+      return {
+        requestId: row.id,
+        state: {
+          targetChatId: data.targetChatId,
+          userId: data.userId,
+          adminMsgId: data.adminMsgId,
+          reason: data.reason || undefined,
+          displayName: data.displayName,
+          username: data.username || undefined,
+          timestamp: data.timestamp.getTime(),
+          additionalMessages: data.additionalMessages || [],
+          decisionStatus: data.decisionStatus || undefined,
+          decisionAdminId: data.decisionAdminId || undefined,
+          decisionAdminName: data.decisionAdminName || undefined,
+          decisionAt: data.decisionAt?.getTime(),
+        },
+      };
+    });
+  }
 }

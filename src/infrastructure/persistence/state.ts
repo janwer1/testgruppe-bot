@@ -26,6 +26,14 @@ export interface StateStoreInterface {
   getActiveRequestIdByUserId(userId: number): Promise<string | undefined>;
   addToTimeline(requestId: string, timestamp: number): Promise<void>;
   getRecentRequests(limit: number, status?: "pending" | "completed"): Promise<string[]>;
+  /**
+   * Optimized variant for admin listing: returns both ids and states so callers
+   * can avoid N+1 `get()` calls.
+   */
+  getRecentRequestStates(
+    limit: number,
+    status?: "pending" | "completed",
+  ): Promise<Array<{ requestId: string; state: RequestState }>>;
 }
 
 export class MemoryStateStore implements StateStoreInterface {
@@ -123,6 +131,20 @@ export class MemoryStateStore implements StateStoreInterface {
       }
     }
     return filtered;
+  }
+
+  async getRecentRequestStates(
+    limit: number,
+    status?: "pending" | "completed",
+  ): Promise<Array<{ requestId: string; state: RequestState }>> {
+    const ids = await this.getRecentRequests(limit, status);
+    const out: Array<{ requestId: string; state: RequestState }> = [];
+    for (const requestId of ids) {
+      const state = this.store.get(this.requestKey(requestId));
+      if (!state) continue;
+      out.push({ requestId, state });
+    }
+    return out;
   }
 
   private cleanup(): void {

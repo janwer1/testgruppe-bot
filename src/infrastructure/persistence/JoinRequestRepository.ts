@@ -58,31 +58,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     if (!state) {
       return undefined;
     }
-
-    const context: JoinRequestContext = {
-      config: this.config,
-      requestId,
-      userId: state.userId,
-      targetChatId: state.targetChatId,
-      displayName: state.displayName,
-      username: state.username,
-      reason: state.reason,
-      additionalMessages: state.additionalMessages,
-      adminMsgId: state.adminMsgId,
-      timestamp: state.timestamp,
-      decision: state.decisionStatus
-        ? {
-            status: state.decisionStatus,
-            adminId: state.decisionAdminId || 0,
-            adminName: state.decisionAdminName || "Unknown",
-            at: state.decisionAt || state.timestamp,
-          }
-        : undefined,
-    };
-
-    const request = JoinRequest.fromContext(context);
-    this.attachLogger(request);
-    return request;
+    return this.hydrateFromState(requestId, state);
   }
 
   /**
@@ -102,19 +78,22 @@ export class JoinRequestRepository implements IJoinRequestRepository {
    */
   async findRecentByStatus(options: { status: "pending" | "completed"; limit?: number }): Promise<JoinRequest[]> {
     const limit = options.limit || 10;
-    const requestIds = await this.store.getRecentRequests(limit, options.status);
-    const requests = await Promise.all(requestIds.map((id) => this.findById(id)));
-    return requests.filter((r): r is JoinRequest => r !== undefined);
+    const items = await this.store.getRecentRequestStates(limit, options.status);
+    const requests = items
+      .map(({ requestId, state }) => this.hydrateFromState(requestId, state))
+      .filter((r): r is JoinRequest => r !== undefined);
+    return requests;
   }
 
   /**
    * Find recent requests (global)
    */
   async findRecent(limit: number = 10): Promise<JoinRequest[]> {
-    const requestIds = await this.store.getRecentRequests(limit);
-    const requests = await Promise.all(requestIds.map((id) => this.findById(id)));
-    // Filter out undefined results (in case of expired/missing data)
-    return requests.filter((r): r is JoinRequest => r !== undefined);
+    const items = await this.store.getRecentRequestStates(limit);
+    const requests = items
+      .map(({ requestId, state }) => this.hydrateFromState(requestId, state))
+      .filter((r): r is JoinRequest => r !== undefined);
+    return requests;
   }
 
   /**
@@ -196,5 +175,32 @@ export class JoinRequestRepository implements IJoinRequestRepository {
         previousState = currentState;
       }
     });
+  }
+
+  private hydrateFromState(requestId: string, state: RequestState): JoinRequest | undefined {
+    const context: JoinRequestContext = {
+      config: this.config,
+      requestId,
+      userId: state.userId,
+      targetChatId: state.targetChatId,
+      displayName: state.displayName,
+      username: state.username,
+      reason: state.reason,
+      additionalMessages: state.additionalMessages,
+      adminMsgId: state.adminMsgId,
+      timestamp: state.timestamp,
+      decision: state.decisionStatus
+        ? {
+            status: state.decisionStatus,
+            adminId: state.decisionAdminId || 0,
+            adminName: state.decisionAdminName || "Unknown",
+            at: state.decisionAt || state.timestamp,
+          }
+        : undefined,
+    };
+
+    const request = JoinRequest.fromContext(context);
+    this.attachLogger(request);
+    return request;
   }
 }
