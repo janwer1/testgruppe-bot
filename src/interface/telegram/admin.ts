@@ -4,7 +4,7 @@ import type { JoinRequest } from "../../domain/JoinRequest";
 import { logger } from "../../shared/logger";
 import { formatDate } from "../../shared/utils/date";
 import type { BotContext } from "../../types";
-import { safeAnswerCallbackQuery } from "./errors";
+import { isMessageNotModifiedError, safeAnswerCallbackQuery } from "./errors";
 
 /**
  * Check if user is authorized to use admin commands
@@ -185,7 +185,14 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
 
     const message = `<b>${title}</b>\n\n${formatRequestList(filteredRequests, ctx.config.timezone)}`;
 
-    // Edit the message instead of sending a new one
-    await ctx.editMessageText(message, { parse_mode: "HTML" });
+    try {
+      await ctx.editMessageText(message, { parse_mode: "HTML" });
+    } catch (e) {
+      if (isMessageNotModifiedError(e)) {
+        logger.info({ component: "Admin", action }, "Edit skipped: message unchanged");
+        return;
+      }
+      throw e;
+    }
   });
 }

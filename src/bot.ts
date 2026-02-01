@@ -48,11 +48,11 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
     await next();
   });
 
-  // Register Admin handlers first to intercept commands.
-  registerAdminHandlers(bot);
+  // Message router: only for non-command text so /admin, /pending, /completed, /cleanup are handled below.
+  const isNotCommand = (ctx: BotContext) =>
+    !ctx.message?.entities?.some((e: { type: string }) => e.type === "bot_command");
 
-  // Message Router: Handles user input based on their current request state.
-  bot.on("message:text", async (ctx: BotContext) => {
+  bot.filter(isNotCommand).on("message:text", async (ctx: BotContext) => {
     if (!ctx.chat || !ctx.from || !ctx.message || !ctx.message.text) {
       return;
     }
@@ -196,6 +196,9 @@ export function createBot(config: BotConfig, repo: IJoinRequestRepository): Bot<
       return;
     }
   });
+
+  // Admin commands (/admin, /pending, /completed, /cleanup) and callback buttons.
+  registerAdminHandlers(bot);
 
   // Register other handlers
   registerJoinRequestHandler(bot);

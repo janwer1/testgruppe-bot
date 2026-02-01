@@ -17,6 +17,15 @@ function isExpiredCallbackQueryError(error: unknown): boolean {
   );
 }
 
+/** True if Telegram returned "message is not modified" (same content/reply_markup). */
+export function isMessageNotModifiedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("editMessageText") &&
+    (message.includes("message is not modified") || message.includes("MESSAGE_NOT_MODIFIED"))
+  );
+}
+
 export async function safeAnswerCallbackQuery(
   ctx: Pick<BotContext, "answerCallbackQuery">,
   // biome-ignore lint/suspicious/noExplicitAny: grammY payload typing depends on context generics
