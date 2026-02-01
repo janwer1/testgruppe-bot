@@ -1,5 +1,7 @@
 import type { BotConfig } from "../../shared/config";
 import { logger } from "../../shared/logger";
+import { getD1Database } from "./d1/client";
+import { D1StateStore } from "./d1/D1StateStore";
 
 export interface RequestState {
   targetChatId: number;
@@ -22,7 +24,6 @@ export interface StateStoreInterface {
   setUserActiveRequest(userId: number, requestId: string): Promise<void>;
   clearUserActiveRequest(userId: number): Promise<void>;
   getActiveRequestIdByUserId(userId: number): Promise<string | undefined>;
-  addToTimeline(requestId: string, timestamp: number): Promise<void>;
   addToTimeline(requestId: string, timestamp: number): Promise<void>;
   getRecentRequests(limit: number, status?: "pending" | "completed"): Promise<string[]>;
 }
@@ -155,8 +156,6 @@ export function createStateStore(config: BotConfig): StateStoreInterface {
       case "d1":
         if (config.db) {
           logger.info({ component: "StateStore" }, "Using D1 (SQLite) as requested via STORAGE_TYPE");
-          const { D1StateStore } = require("./d1/D1StateStore");
-          const { getD1Database } = require("./d1/client");
           return new D1StateStore(getD1Database(config.db));
         }
 
@@ -176,8 +175,6 @@ export function createStateStore(config: BotConfig): StateStoreInterface {
   // 2. Auto-detection (Priority: D1 > Memory)
   if (config.db) {
     logger.info({ component: "StateStore" }, "Auto-detected D1 Database");
-    const { D1StateStore } = require("./d1/D1StateStore");
-    const { getD1Database } = require("./d1/client");
     return new D1StateStore(getD1Database(config.db));
   }
 
