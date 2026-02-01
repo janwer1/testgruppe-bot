@@ -33,13 +33,6 @@ export default {
         if (!bot) {
           const store = createStateStore(config);
 
-          // Auto-initialize D1 table if supported
-          if ("init" in store && typeof (store as { init?: unknown }).init === "function") {
-            logger.info({ component: "Worker" }, "Initializing StateStore...");
-            // biome-ignore lint/suspicious/noExplicitAny: StateStore might have optional init
-            await (store as any).init();
-          }
-
           const repo = new JoinRequestRepository(store, config);
           bot = createBot(config, repo);
           handler = webhookCallback(bot, "std/http", {

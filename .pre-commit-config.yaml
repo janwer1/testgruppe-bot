@@ -5,10 +5,40 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict
       - id: check-added-large-files
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: forbid-env-files
+        name: forbid env files
+        entry: 'Environment files (.env) should never be committed'
+        language: fail
+        files: '\.env$'
 
   - repo: https://github.com/biomejs/pre-commit
     rev: v2.3.13
     hooks:
+      # --- 3. Formatting & Linting ---
       - id: biome-check
       - id: biome-format
+
+  - repo: local
+    hooks:
+      # --- 4. Deep Validation (Slowest) ---
+      - id: type-check
+        name: type-check
+        entry: bun type-check
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: test
+        name: test
+        entry: bun test
+        language: system
+        pass_filenames: false
+        always_run: true

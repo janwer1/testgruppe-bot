@@ -13,10 +13,11 @@
 
 ### Configuration & Dependency Injection
 
-Environment variables are validated via `zod` in `src/env.ts` and mapped to a `BotConfig` object. The application uses a Formal DI pattern to manage dependencies and configuration without global state side-effects:
+Environment variables are validated via `arktype` in `src/env.ts` and mapped to a `BotConfig` object. The application uses a Formal DI pattern to manage dependencies and configuration without global state side-effects:
 - `BotConfig`: Centralized type-safe configuration object.
 - `BotContext`: GrammY context extended with `config` and `repo` (JoinRequestRepository).
 - **Wiring**: Dependencies are instantiated in entry points (`worker.ts`, `dev.ts`) and injected into the bot instance and context middleware.
+- **Environment Loading**: Bun automatically loads `.env` files into `process.env`. Do NOT add `import "dotenv/config"` to scripts - it's unnecessary and redundant.
 
 ### Statelessness & State Hydration
 

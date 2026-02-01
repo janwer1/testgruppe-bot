@@ -44,21 +44,29 @@ export async function restoreProductionWebhook(config: BotConfig) {
 }
 
 /**
- * Sets up standard signal handlers for graceful shutdown.
+ * Sets up standard signal and error handlers for graceful shutdown (restore webhook on exit).
  */
 export function setupShutdownHandlers(cleanup: (signal: string) => Promise<void>) {
   let isShuttingDown = false;
 
-  const wrapper = async (signal: string) => {
+  const wrapper = async (signal: string, exitCode: number = 0) => {
     if (isShuttingDown) return;
     isShuttingDown = true;
     logger.info({ component: "Dev", signal }, "Shutting down");
     await cleanup(signal);
-    process.exit(0);
+    process.exit(exitCode);
   };
 
   process.on("SIGINT", () => wrapper("SIGINT"));
   process.on("SIGTERM", () => wrapper("SIGTERM"));
+  process.on("uncaughtException", (err) => {
+    logger.error({ component: "Dev", err }, "Uncaught exception");
+    wrapper("uncaughtException", 1);
+  });
+  process.on("unhandledRejection", (reason, promise) => {
+    logger.error({ component: "Dev", reason, promise }, "Unhandled rejection");
+    wrapper("unhandledRejection", 1);
+  });
 }
 
 /**

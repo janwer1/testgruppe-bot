@@ -15,10 +15,6 @@ export class D1StateStore implements StateStoreInterface {
     this.repo = getRequestsRepository(db);
   }
 
-  async init() {
-    await this.repo.initialize();
-  }
-
   async set(requestId: string, state: RequestState): Promise<void> {
     const data: DbRequestState = {
       requestId: requestId,

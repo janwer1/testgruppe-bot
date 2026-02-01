@@ -40,8 +40,6 @@ async function main() {
       logger.info({ component: "Dev", dbPath }, "Emulated D1 using local file");
 
       store = new D1StateStore(db);
-      // biome-ignore lint/suspicious/noExplicitAny: D1StateStore has init
-      await (store as any).init();
     } catch (e) {
       logger.error({ component: "Dev", err: e }, "Failed to emulate D1");
       logger.warn({ component: "Dev" }, "Falling back to standard createStateStore (Memory)");

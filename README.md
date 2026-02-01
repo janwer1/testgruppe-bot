@@ -17,7 +17,7 @@ See [AGENTS.md](./AGENTS.md) for architectural details and implementation patter
 - **Runtime**: Bun / Edge Runtime
 - **Framework**: grammY (core)
 - **State Engine**: XState v5 (Domain Logic)
-- **Environment**: T3 Env + Zod
+- **Type Safety**: ArkType — runtime validation from environment config to database persistence, ensuring type-safe contracts across the entire stack
 - **Storage**: Cloudflare D1 (SQLite)
 
 ## Prerequisites

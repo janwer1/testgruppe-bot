@@ -15,9 +15,11 @@ async function main() {
   const env = parseEnv();
   const config = createConfigFromEnv(env);
   let wranglerProcess: ChildProcess | null = null;
+  let isShuttingDown = false;
 
   // Handle graceful shutdown
   setupShutdownHandlers(async () => {
+    isShuttingDown = true;
     if (wranglerProcess) {
       await shutdownChildTiered(wranglerProcess);
     }
@@ -32,10 +34,12 @@ async function main() {
     env: { ...process.env, FORCE_COLOR: "1" },
   });
 
-  // Listen for 'close' to ensure stdio is drained
+  // Listen for 'close' to ensure stdio is drained (do not exit here during graceful shutdown so restore can run)
   wranglerProcess.on("close", (code: number) => {
     logger.warn({ component: "Dev", code }, "Wrangler closed");
-    process.exit(code);
+    if (!isShuttingDown) {
+      process.exit(code);
+    }
   });
 
   // 2. Register Webhook if LOCAL_TUNNEL_URL is provided
