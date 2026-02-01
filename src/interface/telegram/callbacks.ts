@@ -4,7 +4,7 @@ import { updateReviewCard } from "../../application/services/reviewCard";
 import { logger } from "../../shared/logger";
 import { getMessage } from "../../templates/messages";
 import type { BotContext } from "../../types";
-import { handleError, sendErrorToAdminGroup } from "./errors";
+import { handleError, safeAnswerCallbackQuery, sendErrorToAdminGroup } from "./errors";
 
 export function registerCallbackHandlers(bot: Bot<BotContext>): void {
   bot.on("callback_query:data", async (ctx: BotContext) => {
@@ -16,7 +16,7 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
     const adminName = ctx.from.username || ctx.from.first_name || "Unknown";
 
     if (!data) {
-      await ctx.answerCallbackQuery({
+      await safeAnswerCallbackQuery(ctx, {
         text: "Invalid callback data",
         show_alert: true,
       });
@@ -27,7 +27,7 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
     const [action, requestId] = data.split("_", 2);
 
     if (action !== "approve" && action !== "decline") {
-      await ctx.answerCallbackQuery({
+      await safeAnswerCallbackQuery(ctx, {
         text: "Unknown action",
         show_alert: true,
       });
@@ -37,7 +37,7 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
     const isUlid = /^[0-9A-Z]{26}$/i.test(requestId);
 
     if (!requestId || !isUlid) {
-      await ctx.answerCallbackQuery({
+      await safeAnswerCallbackQuery(ctx, {
         text: `Invalid request ID format: ${requestId}`,
         show_alert: true,
       });
@@ -48,7 +48,7 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
       // Get request using repository
       const request = await ctx.repo.findById(requestId);
       if (!request) {
-        await ctx.answerCallbackQuery({
+        await safeAnswerCallbackQuery(ctx, {
           text: getMessage("request-not-found"),
           show_alert: true,
         });
@@ -59,7 +59,7 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
 
       // Check idempotency
       if (request.isProcessed()) {
-        await ctx.answerCallbackQuery({
+        await safeAnswerCallbackQuery(ctx, {
           text: getMessage("request-processed"),
           show_alert: false,
         });
@@ -70,7 +70,7 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
       // TODO: Refactor authz to use context/config
       const isAuthorized = await isAdminInBothChats(bot, adminId, ctx.config);
       if (!isAuthorized) {
-        await ctx.answerCallbackQuery({
+        await safeAnswerCallbackQuery(ctx, {
           text: getMessage("not-authorized"),
           show_alert: true,
         });
@@ -143,13 +143,13 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
             ctx.config,
           );
 
-          await ctx.answerCallbackQuery({
+          await safeAnswerCallbackQuery(ctx, {
             text: userIsAlreadyApproved ? getMessage("already-approved") : getMessage("action-success-approved"),
             show_alert: false,
           });
         } catch (apiError) {
           await sendErrorToAdminGroup(bot, apiError, "approveChatJoinRequest", ctx.config);
-          await ctx.answerCallbackQuery({
+          await safeAnswerCallbackQuery(ctx, {
             text: getMessage("error-approving"),
             show_alert: true,
           });
@@ -216,13 +216,13 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
             ctx.config,
           );
 
-          await ctx.answerCallbackQuery({
+          await safeAnswerCallbackQuery(ctx, {
             text: userIsAlreadyDeclined ? getMessage("already-declined") : getMessage("action-success-declined"),
             show_alert: false,
           });
         } catch (apiError) {
           await sendErrorToAdminGroup(bot, apiError, "declineChatJoinRequest", ctx.config);
-          await ctx.answerCallbackQuery({
+          await safeAnswerCallbackQuery(ctx, {
             text: getMessage("error-declining"),
             show_alert: true,
           });

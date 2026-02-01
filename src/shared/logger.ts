@@ -1,6 +1,28 @@
 import { pino } from "pino";
 import { parseEnv } from "./env";
 
+function safeJsonStringify(value: unknown): string {
+  const seen = new WeakSet<object>();
+  return JSON.stringify(value, (_key, val) => {
+    if (typeof val === "bigint") return val.toString();
+
+    if (val instanceof Error) {
+      return {
+        type: val.name,
+        message: val.message,
+        stack: val.stack,
+      };
+    }
+
+    if (typeof val === "object" && val !== null) {
+      if (seen.has(val)) return "[Circular]";
+      seen.add(val);
+    }
+
+    return val;
+  });
+}
+
 /**
  * Creates a configured logger instance.
  * In development mode, it uses a custom browser writer to ensure
@@ -23,7 +45,15 @@ export function setupLogger() {
     browser: {
       serialize: true,
       asObject: true,
-      write: (o) => console.log(JSON.stringify(o)),
+      write: (o) => {
+        try {
+          console.log(safeJsonStringify(o));
+        } catch {
+          // Never let logging crash the worker.
+          console.log("[logger] failed to serialize log payload");
+          console.log(o);
+        }
+      },
     },
   });
 }

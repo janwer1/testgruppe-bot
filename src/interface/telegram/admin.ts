@@ -4,6 +4,7 @@ import type { JoinRequest } from "../../domain/JoinRequest";
 import { logger } from "../../shared/logger";
 import { formatDate } from "../../shared/utils/date";
 import type { BotContext } from "../../types";
+import { safeAnswerCallbackQuery } from "./errors";
 
 /**
  * Check if user is authorized to use admin commands
@@ -124,12 +125,12 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(/^admin:(pending|completed)$/, async (ctx) => {
     const isAuthorized = await checkAdminAuth(ctx);
     if (!isAuthorized) {
-      await ctx.answerCallbackQuery("❌ Not authorized");
+      await safeAnswerCallbackQuery(ctx, "❌ Not authorized");
       return;
     }
 
     const action = ctx.match[1];
-    await ctx.answerCallbackQuery();
+    await safeAnswerCallbackQuery(ctx);
 
     const limit = 10;
 
