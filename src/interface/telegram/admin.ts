@@ -121,6 +121,44 @@ export function registerAdminHandlers(bot: Bot<BotContext>): void {
     await ctx.reply(message, { parse_mode: "HTML" });
   });
 
+  // Cleanup: list pending and optionally mark all as stale (declined)
+  const CLEANUP_LIMIT = 100;
+
+  bot.command("cleanup", async (ctx) => {
+    const isAuthorized = await checkAdminAuth(ctx);
+    if (!isAuthorized) return;
+
+    const confirm = ctx.match?.trim().toLowerCase() === "confirm";
+
+    if (confirm) {
+      const pending = await ctx.repo.findRecentByStatus({ status: "pending", limit: CLEANUP_LIMIT });
+      const requestIds = pending.map((r) => r.getContext().requestId);
+
+      if (requestIds.length === 0) {
+        await ctx.reply("No pending requests to clean.");
+        return;
+      }
+
+      const marked = await ctx.repo.markPendingAsStaleResolved(requestIds, "system");
+      logger.info({ component: "Admin", marked, total: requestIds.length }, "Cleanup: marked pending as stale");
+      await ctx.reply(`Marked ${marked} pending request(s) as stale (declined).`);
+      return;
+    }
+
+    const pending = await ctx.repo.findRecentByStatus({ status: "pending", limit: CLEANUP_LIMIT });
+
+    if (pending.length === 0) {
+      await ctx.reply("No pending requests.");
+      return;
+    }
+
+    const list = formatRequestList(pending, ctx.config.timezone);
+    await ctx.reply(
+      `<b>Pending (stale cleanup)</b>\n\n${list}To mark all ${pending.length} as stale, send:\n<code>/cleanup confirm</code>`,
+      { parse_mode: "HTML" },
+    );
+  });
+
   // Callback query handler for menu buttons
   bot.callbackQuery(/^admin:(pending|completed)$/, async (ctx) => {
     const isAuthorized = await checkAdminAuth(ctx);

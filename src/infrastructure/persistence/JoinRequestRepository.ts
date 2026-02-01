@@ -14,6 +14,8 @@ export interface IJoinRequestRepository {
   findRecent(limit?: number): Promise<JoinRequest[]>;
   findRecentByStatus(options: { status: "pending" | "completed"; limit?: number }): Promise<JoinRequest[]>;
   save(request: JoinRequest): Promise<void>;
+  /** Mark pending requests as declined (stale) without going through the domain. Used for admin cleanup. */
+  markPendingAsStaleResolved(requestIds: string[], resolvedBy: string): Promise<number>;
 }
 
 /**
@@ -113,6 +115,31 @@ export class JoinRequestRepository implements IJoinRequestRepository {
     const requests = await Promise.all(requestIds.map((id) => this.findById(id)));
     // Filter out undefined results (in case of expired/missing data)
     return requests.filter((r): r is JoinRequest => r !== undefined);
+  }
+
+  /**
+   * Mark pending requests as declined (stale). Updates store only; no Telegram API or domain transitions.
+   * Returns the number of requests actually marked.
+   */
+  async markPendingAsStaleResolved(requestIds: string[], resolvedBy: string): Promise<number> {
+    let marked = 0;
+    const now = Date.now();
+
+    for (const requestId of requestIds) {
+      const state = await this.store.get(requestId);
+      if (!state || state.decisionStatus) continue;
+
+      await this.store.set(requestId, {
+        ...state,
+        decisionStatus: "declined",
+        decisionAt: now,
+        decisionAdminId: 0,
+        decisionAdminName: resolvedBy,
+      });
+      marked += 1;
+    }
+
+    return marked;
   }
 
   /**
