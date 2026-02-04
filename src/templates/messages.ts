@@ -11,6 +11,7 @@ type MessageKey =
   | "message-empty"
   | "message-too-long"
   | "approved-user"
+  | "approved-user-intro"
   | "declined-user"
   | "request-processed"
   | "request-not-found"
@@ -49,6 +50,8 @@ function initMessages() {
 
     // Callback / Status messages
     "approved-user": "✅ Glückwunsch! Deine Beitrittsanfrage wurde genehmigt! 🎉",
+    "approved-user-intro":
+      "Wir würden uns freuen, wenn du dich kurz im Kanal #General vorstellst – einfach ein bis zwei Sätze zu dir und was dich besonders interessiert - Kraftsport, PEDs, HGH ... 💪",
     "declined-user": "❌ Deine Beitrittsanfrage wurde leider abgelehnt.",
     "request-processed": "⚠️ Diese Anfrage wurde bereits bearbeitet.",
     "request-not-found": "⚠️ Anfrage nicht gefunden oder abgelaufen.",

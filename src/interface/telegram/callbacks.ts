@@ -115,9 +115,10 @@ export function registerCallbackHandlers(bot: Bot<BotContext>): void {
           // Save updated request
           await ctx.repo.save(request);
 
-          // Notify user
+          // Notify user (approval + intro prompt)
           try {
             await bot.api.sendMessage(context.userId, getMessage("approved-user"));
+            await bot.api.sendMessage(context.userId, getMessage("approved-user-intro"));
           } catch (userError) {
             logger.error(
               { component: "Callback", err: userError, userId: context.userId },

@@ -20,8 +20,7 @@
     "postinstall": "bun run webhook:setup",
     "dev:worker": "sh -c 'bun src/dev-worker.ts \"$@\" | pino-pretty' --",
     "deploy": "wrangler deploy",
-    "tail": "sh -c 'bunx wrangler tail testgruppe-bot | pino-pretty'",
-    "tail:zap": "sh -c 'bunx wrangler tail testgruppe-bot | bun src/scripts/wrangler-to-zap.ts | zap-pretty' --"
+    "tail": "sh -c 'bunx wrangler tail testgruppe-bot | pino-pretty'"
   },
   "dependencies": {
     "@std/ulid": "npm:@jsr/std__ulid",
