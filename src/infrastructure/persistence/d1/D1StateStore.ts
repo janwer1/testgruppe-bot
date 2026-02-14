@@ -30,6 +30,7 @@ export class D1StateStore implements StateStoreInterface {
       decisionAdminId: state.decisionAdminId,
       decisionAdminName: state.decisionAdminName,
       decisionAt: state.decisionAt ? new Date(state.decisionAt) : undefined,
+      machineState: state.machineState,
     };
 
     await this.repo.upsert(data, requestId);
@@ -54,6 +55,7 @@ export class D1StateStore implements StateStoreInterface {
       decisionAdminId: data.decisionAdminId || undefined,
       decisionAdminName: data.decisionAdminName || undefined,
       decisionAt: data.decisionAt?.getTime(),
+      machineState: data.machineState || undefined,
     };
   }
 
@@ -157,6 +159,7 @@ export class D1StateStore implements StateStoreInterface {
           decisionAdminId: data.decisionAdminId || undefined,
           decisionAdminName: data.decisionAdminName || undefined,
           decisionAt: data.decisionAt?.getTime(),
+          machineState: data.machineState || undefined,
         },
       };
     });

@@ -16,6 +16,7 @@ export interface RequestState {
   decisionAdminId?: number;
   decisionAdminName?: string;
   decisionAt?: number;
+  machineState?: string; // JSON-serialized XState snapshot
 }
 
 export interface StateStoreInterface {

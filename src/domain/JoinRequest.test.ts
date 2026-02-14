@@ -37,7 +37,7 @@ test("JoinRequest should reject invalid reason (too long)", () => {
   const longReason = "a".repeat(501); // Assuming MAX_REASON_CHARS is 500
   const result = request.submitReason(longReason);
   expect(result.success).toBe(false);
-  expect(result.error).toBeDefined();
+  expect(result.error?.message).toBeDefined();
 });
 
 test("JoinRequest should reject invalid reason (empty)", () => {
@@ -47,7 +47,7 @@ test("JoinRequest should reject invalid reason (empty)", () => {
 
   const result = request.submitReason("   ");
   expect(result.success).toBe(false);
-  expect(result.error).toBeDefined();
+  expect(result.error?.message).toBeDefined();
 });
 
 test("JoinRequest should add additional messages", () => {
@@ -117,7 +117,7 @@ test("JoinRequest should not allow approving without reason", () => {
 
   const result = request.approve(123, "Admin Name");
   expect(result.success).toBe(false);
-  expect(result.error).toContain("not awaiting review");
+  expect(result.error?.message).toContain("not awaiting review");
 });
 
 test("JoinRequest should not allow approving twice", () => {
@@ -132,7 +132,7 @@ test("JoinRequest should not allow approving twice", () => {
   expect(result.success).toBe(false);
   // Error message depends on state - in "approved" state, it's "not awaiting review"
   expect(result.error).toBeDefined();
-  expect(result.error).toMatch(/not awaiting review|already been processed/);
+  expect(result.error?.message).toMatch(/not awaiting review|already been processed/);
 });
 
 test("JoinRequest should restore from context correctly", () => {

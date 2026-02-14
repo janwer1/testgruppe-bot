@@ -9,3 +9,4 @@ CREATE INDEX IF NOT EXISTS idx_requests_userId ON requests(json_extract(data, '$
 CREATE INDEX IF NOT EXISTS idx_requests_requestId ON requests(json_extract(data, '$.json.requestId'));
 CREATE INDEX IF NOT EXISTS idx_requests_decisionStatus ON requests(json_extract(data, '$.json.decisionStatus'));
 CREATE INDEX IF NOT EXISTS idx_requests_adminMsgId ON requests(json_extract(data, '$.json.adminMsgId'));
+CREATE INDEX IF NOT EXISTS idx_requests_machineState ON requests(json_extract(data, '$.json.machineState'));

@@ -19,6 +19,7 @@ export const RequestStateSchema = type({
   decisionAdminId: "number | undefined",
   decisionAdminName: "string | undefined",
   decisionAt: "Date | undefined",
+  machineState: "string | undefined",
 });
 
 export type RequestState = typeof RequestStateSchema.infer;

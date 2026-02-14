@@ -1,4 +1,5 @@
 import { type Actor, createActor, type SnapshotFrom } from "xstate";
+import { JoinRequestError } from "./errors";
 import type { JoinRequestContext, JoinRequestInput } from "./joinRequestMachine";
 import { joinRequestMachine } from "./joinRequestMachine";
 import { validateAdditionalMessage, validateReason } from "./validation";
@@ -23,6 +24,13 @@ export class JoinRequest {
    */
   subscribe(callback: (snapshot: SnapshotFrom<typeof joinRequestMachine>) => void) {
     return this.actor.subscribe(callback);
+  }
+
+  /**
+   * Get persisted snapshot for durable restoration
+   */
+  getSnapshot(): SnapshotFrom<typeof joinRequestMachine> {
+    return this.actor.getPersistedSnapshot() as SnapshotFrom<typeof joinRequestMachine>;
   }
 
   /**
@@ -66,11 +74,11 @@ export class JoinRequest {
   /**
    * Submit reason (validates and transitions to awaitingReview)
    */
-  submitReason(reason: string): { success: boolean; error?: string } {
+  submitReason(reason: string): { success: boolean; error?: JoinRequestError } {
     if (!this.isInState("collectingReason")) {
       return {
         success: false,
-        error: "Request is not in collecting reason state",
+        error: new JoinRequestError("INVALID_STATE", "Request is not in collecting reason state"),
       };
     }
 
@@ -80,15 +88,18 @@ export class JoinRequest {
       this.syncContext();
       return { success: true };
     }
-    return { success: false, error: validation.error };
+    return {
+      success: false,
+      error: new JoinRequestError("VALIDATION_FAILED", validation.error),
+    };
   }
 
   /**
    * Set admin message ID (for review card)
    */
-  setAdminMsgId(adminMsgId: number): { success: boolean; error?: string } {
+  setAdminMsgId(adminMsgId: number): { success: boolean; error?: JoinRequestError } {
     if (!this.isInState("awaitingReview")) {
-      return { success: false, error: "Request is not awaiting review" };
+      return { success: false, error: new JoinRequestError("INVALID_STATE", "Request is not awaiting review") };
     }
 
     try {
@@ -96,16 +107,19 @@ export class JoinRequest {
       this.syncContext();
       return { success: true };
     } catch (error) {
-      return { success: false, error: String(error) };
+      return {
+        success: false,
+        error: new JoinRequestError("INVALID_STATE", "Failed to set admin message ID", error),
+      };
     }
   }
 
   /**
    * Add additional message
    */
-  addMessage(message: string): { success: boolean; error?: string } {
+  addMessage(message: string): { success: boolean; error?: JoinRequestError } {
     if (!this.isInState("awaitingReview")) {
-      return { success: false, error: "Request is not awaiting review" };
+      return { success: false, error: new JoinRequestError("INVALID_STATE", "Request is not awaiting review") };
     }
 
     const validation = validateAdditionalMessage(message, this.context.config);
@@ -114,19 +128,22 @@ export class JoinRequest {
       this.syncContext();
       return { success: true };
     }
-    return { success: false, error: validation.error };
+    return {
+      success: false,
+      error: new JoinRequestError("VALIDATION_FAILED", validation.error),
+    };
   }
 
   /**
    * Approve request
    */
-  approve(adminId: number, adminName: string): { success: boolean; error?: string } {
+  approve(adminId: number, adminName: string): { success: boolean; error?: JoinRequestError } {
     if (!this.isInState("awaitingReview")) {
-      return { success: false, error: "Request is not awaiting review" };
+      return { success: false, error: new JoinRequestError("INVALID_STATE", "Request is not awaiting review") };
     }
 
     if (this.isProcessed()) {
-      return { success: false, error: "Request has already been processed" };
+      return { success: false, error: new JoinRequestError("ALREADY_PROCESSED", "Request has already been processed") };
     }
 
     try {
@@ -134,20 +151,23 @@ export class JoinRequest {
       this.syncContext();
       return { success: true };
     } catch (error) {
-      return { success: false, error: String(error) };
+      return {
+        success: false,
+        error: new JoinRequestError("INVALID_STATE", "Failed to approve request", error),
+      };
     }
   }
 
   /**
    * Decline request
    */
-  decline(adminId: number, adminName: string): { success: boolean; error?: string } {
+  decline(adminId: number, adminName: string): { success: boolean; error?: JoinRequestError } {
     if (!this.isInState("awaitingReview")) {
-      return { success: false, error: "Request is not awaiting review" };
+      return { success: false, error: new JoinRequestError("INVALID_STATE", "Request is not awaiting review") };
     }
 
     if (this.isProcessed()) {
-      return { success: false, error: "Request has already been processed" };
+      return { success: false, error: new JoinRequestError("ALREADY_PROCESSED", "Request has already been processed") };
     }
 
     try {
@@ -155,7 +175,10 @@ export class JoinRequest {
       this.syncContext();
       return { success: true };
     } catch (error) {
-      return { success: false, error: String(error) };
+      return {
+        success: false,
+        error: new JoinRequestError("INVALID_STATE", "Failed to decline request", error),
+      };
     }
   }
 
@@ -231,6 +254,17 @@ export class JoinRequest {
       request.syncContext();
     }
 
+    return request;
+  }
+
+  /**
+   * Restore from a persisted XState snapshot
+   */
+  static fromSnapshot(snapshot: SnapshotFrom<typeof joinRequestMachine>): JoinRequest {
+    const request = Object.create(JoinRequest.prototype) as JoinRequest;
+    request.actor = createActor(joinRequestMachine, { snapshot, input: snapshot.context as JoinRequestInput });
+    request.actor.start();
+    request.syncContext();
     return request;
   }
 }

@@ -143,6 +143,7 @@ export class JoinRequestRepository implements IJoinRequestRepository {
       decisionAdminId: context.decision?.adminId,
       decisionAdminName: context.decision?.adminName,
       decisionAt: context.decision?.at,
+      machineState: JSON.stringify(request.getSnapshot()),
     };
 
     // Save the request entity
@@ -178,6 +179,20 @@ export class JoinRequestRepository implements IJoinRequestRepository {
   }
 
   private hydrateFromState(requestId: string, state: RequestState): JoinRequest | undefined {
+    if (state.machineState) {
+      try {
+        const snapshot = JSON.parse(state.machineState);
+        const request = JoinRequest.fromSnapshot(snapshot);
+        this.attachLogger(request);
+        return request;
+      } catch (error) {
+        logger.warn(
+          { component: "Repository", requestId, err: error },
+          "Failed to restore from snapshot, falling back to event replay",
+        );
+      }
+    }
+
     const context: JoinRequestContext = {
       config: this.config,
       requestId,

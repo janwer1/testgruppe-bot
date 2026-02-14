@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { createReviewCardKeyboard, type ReviewCardData } from "./reviewCard";
+import { createReviewCardKeyboard } from "../views/reviewCardView";
+import type { ReviewCardData } from "./reviewCard";
 
 test("createReviewCardKeyboard should create keyboard with approve and decline buttons", () => {
   const keyboard = createReviewCardKeyboard("test-request-123");

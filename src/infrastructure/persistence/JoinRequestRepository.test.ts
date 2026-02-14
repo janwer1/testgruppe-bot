@@ -80,6 +80,26 @@ test("should persist decision information", async () => {
   expect(found?.getContext().decision?.adminName).toBe("Admin Name");
 });
 
+test("should restore from persisted snapshot when available", async () => {
+  const store = new MemoryStateStore(mockConfig);
+  const repository = new JoinRequestRepository(store, mockConfig);
+  const testInput = createTestRequestInput();
+  const request = await repository.create(testInput);
+  request.startCollection();
+  request.submitReason("Snapshot restore reason");
+  request.setAdminMsgId(321);
+  request.addMessage("Message A");
+  request.addMessage("Message B");
+  await repository.save(request);
+
+  const found = await repository.findById(testInput.requestId);
+  expect(found).toBeDefined();
+  expect(found?.getState()).toBe("awaitingReview");
+  expect(found?.getContext().reason).toBe("Snapshot restore reason");
+  expect(found?.getContext().adminMsgId).toBe(321);
+  expect(found?.getContext().additionalMessages).toEqual(["Message A", "Message B"]);
+});
+
 test("should return undefined for non-existent request", async () => {
   const store = new MemoryStateStore(mockConfig);
   const repository = new JoinRequestRepository(store, mockConfig);
